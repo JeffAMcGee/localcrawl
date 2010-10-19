@@ -6,6 +6,7 @@ import time
 import logging
 from restkit.errors import RequestFailed
 from settings import settings
+from models import User, Tweet, as_local_id, as_int_id
 
 class TwitterResource(Resource):
     # When a request fails, we retry with an exponential backoff from
@@ -41,7 +42,7 @@ class TwitterResource(Resource):
                         failure.response.status,
                         failure.response.final_url
                 )
-                if r.status_int in (400,420,502,503):
+                if failure.response.status_int in (400,420,502,503):
                     # The whale says slow down!
                     delay = 240
                 time.sleep(delay)
@@ -53,7 +54,7 @@ class TwitterResource(Resource):
             trim_user=1,
             include_rts=1,
             include_entities=1,
-            **kwargs,
+            **kwargs
         )
         tweets = [Tweet(status) for status in timeline]
         for tweet in tweets:
@@ -66,7 +67,7 @@ class TwitterResource(Resource):
     def get_ids(self, path, user_id):
         ids=self.get_d(
             user_id=as_int_id(user_id)
-            **kwargs,
+            **kwargs
         )
         return [as_local_id('U',id) for id in ids['ids']]
 
@@ -75,7 +76,7 @@ class TwitterResource(Resource):
         lookup = self.get_d(
             "users/lookup.json",
             user_id=ids,
-            **kwargs,
+            **kwargs
         )
         return [User(d) for d in lookup]
 
@@ -90,12 +91,12 @@ class TwitterResource(Resource):
         return self.get_tweets(
             "statuses/mentions.json",
             user_id=as_int_id(user_id)
-            **kwargs,
+            **kwargs
         )
 
     def user_timeline(self, user_id, **kwargs):
         return self.get_tweets(
             "statuses/user_timeline.json",
             user_id=as_int_id(user_id)
-            **kwargs,
+            **kwargs
         )
