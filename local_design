@@ -1,0 +1,40 @@
+user
+    _id
+    local
+        daily_tweets
+        depth
+        state = [new, lookup, crawl, ignore]
+        local_prob = [0,.5,1]
+        local_friends
+        local_mentions
+    ignore = profile_
+
+followers
+    id
+    ids
+
+friends
+    id
+    ids
+
+tweet
+    id
+    user_id (uid)
+    ignore = user
+
+user ids
+
+new - called when other queues run low
+    searches database for users with .5 that should be 1 based on friends and mentions
+        for each mention and friend:
+            add new user to lookup queue with priorty depth +1
+
+lookup - gets list of users in new state
+    call users/lookup
+    for each user
+        set local_prob to 0, .5, or 1
+        if local_prob >0:
+        friends/ids followers/ids statuses/mentions statuses/user_timeline
+        if local_prob ==1:
+            for each mention and friend:
+                add new user to lookup queue with priorty depth +1
