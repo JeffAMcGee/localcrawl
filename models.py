@@ -46,14 +46,15 @@ class User(Model):
         'profile_background_color', 'profile_background_image_url',
         'profile_background_tile', '', 'profile_link_color',
         'profile_sidebar_border_color', 'profile_sidebar_fill_color',
-        'profile_text_color', 'profile_use_background_image', 'protected',
-        'show_all_inline_media', 'time_zone', 'status'
+        'profile_text_color', 'profile_use_background_image',
+        'show_all_inline_media', 'time_zone', 'status', 'notifications',
     ]
 
     _id = TwitterIdProperty('_id','U')
+    local = ModelProperty('l',LocalUser)
     
+    #properties from twitter
     verified = BoolProperty("ver")
-    notifications = BoolProperty('nts')
     created_at = TwitterDateTimeProperty('ca')
     description = TextProperty('descr')
     favourites_count = IntProperty('favc')
@@ -71,8 +72,6 @@ class User(Model):
     url = TextProperty('url')
     utc_offset = IntProperty('utco')
 
-    local = ModelProperty('l',LocalUser)
-
 
 class Tweet(Model):
     ignore = [
@@ -82,15 +81,17 @@ class Tweet(Model):
     ]
 
     _id = TwitterIdProperty('_id','T')
+    mentions = SlugListProperty('ats') #based on entities
 
+    #properties from twitter
     coordinates = Property('coord')
     created_at = TwitterDateTimeProperty('ca')
-    mentions = SlugListProperty('ats') #from entities
     favorited = BoolProperty('fav')
     geo = Property('geo')
     in_reply_to_status_id = TwitterIdProperty('rtt','T')
     in_reply_to_user_id = TwitterIdProperty('rtu','U')
     place = Property('plc')
-    retweet_count = IntProperty('rtc')
+    retweeted = Property('rt') #do we want this?
+    retweeted_count = IntProperty('rtc')
     text = TextProperty('tx')
     user_id = TwitterIdProperty('uid','U')
