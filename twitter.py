@@ -6,7 +6,7 @@ import time
 import logging
 from restkit.errors import RequestFailed
 from settings import settings
-from models import User, Tweet, as_local_id, as_int_id
+from models import Relationships, User, Tweet, as_local_id, as_int_id
 
 class TwitterResource(Resource):
     # When a request fails, we retry with an exponential backoff from
@@ -29,7 +29,8 @@ class TwitterResource(Resource):
         for delay in self.backoff_seconds:
             try:
                 r = self.get(path, headers, **kwargs)
-                self.remaining = r.headers['x-ratelimit-remaining']
+                if 'x-ratelimit-remaining' in r.headers:
+                    self.remaining = r.headers['x-ratelimit-remaining']
                 if r.status_int == 304:
                     # I don't think this should happen - that's
                     # why I raise the exception.
@@ -48,12 +49,13 @@ class TwitterResource(Resource):
                 time.sleep(delay)
         raise Exception("Epic Fail Whale! - %s"%r.final_url)
 
-    def get_ids(self, path, user_id):
+    def get_ids(self, path, user_id, **kwargs):
         ids=self.get_d(
-            user_id=as_int_id(user_id)
+            path=path,
+            user_id=as_int_id(user_id),
             **kwargs
         )
-        return [as_local_id('U',id) for id in ids['ids']]
+        return (as_local_id('U',id) for id in ids)
 
     def user_lookup(self, user_ids, **kwargs):
         ids = ','.join(str(as_int_id(u)) for u in user_ids)
@@ -62,28 +64,29 @@ class TwitterResource(Resource):
             user_id=ids,
             **kwargs
         )
-        return [User(d) for d in lookup]
+        return (User(d) for d in lookup)
 
     def friends_ids(self, user_id):
         return self.get_ids("friends/ids.json", user_id)
 
-    def friends_ids(self, user_id):
+    def followers_ids(self, user_id):
         return self.get_ids("followers/ids.json", user_id)
+
+    def get_relationships(self, user_id):
+        return Relationships(
+                _id=as_int_id(user_id),
+                friends=self.friends_ids(user_id),
+                followers=self.followers_ids(user_id),
+        )
 
     def user_timeline(self, user_id, **kwargs):
         timeline = self.get_d(
             "statuses/user_timeline.json",
-            user_id=as_int_id(user_id)
+            user_id=as_int_id(user_id),
             trim_user=1,
             include_rts=1,
             include_entities=1,
+            count=200,
             **kwargs
         )
-        tweets = [Tweet(t) for t in timeline]
-        for tweet in tweets:
-            tweet._id = tweet.id
-            tweet.mentions = [
-                as_local_id('U', at['id'])
-                for at in tweet.entities['user_mentions']
-            ]
-        return tweets
+        return (Tweet(t) for t in timeline)

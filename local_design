@@ -1,24 +1,18 @@
 user
-    _id
+    U_id
     local
         daily_tweets
         depth
         state = [new, lookup, crawl, ignore]
-        local_prob = [0,.5,1]
-        local_friends
-        local_mentions
-    ignore = profile_
+        rfriend_score
+        at_score
 
-followers
-    id
-    ids
-
-friends
-    id
-    ids
+network
+    N_id
+    rfriends
 
 tweet
-    id
+    T_id
     user_id (uid)
     ignore = user
 
