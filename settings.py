@@ -6,7 +6,9 @@ class SettingsBunch(dict):
         self[name] = value
 
 settings = SettingsBunch(
-    couchdb = 'http://127.0.0.1:5984/local',
+    couchdb = 'http://127.0.0.1:5984/jeff',
+    beanstalk_host = 'localhost',
+    beanstalk_port = 11300,
 )
 
 try:

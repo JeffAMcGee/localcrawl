@@ -118,3 +118,7 @@ class Relationships(TwitterModel):
         big = set(big)
         return [u for u in lil if u in big]
 
+class JobBody(ModelPart):
+    _id = TwitterIdProperty('_id','U')
+    rfriends_score = IntProperty('rfs')
+    mention_score = IntProperty('ats')
