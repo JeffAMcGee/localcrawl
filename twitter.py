@@ -48,22 +48,6 @@ class TwitterResource(Resource):
                 time.sleep(delay)
         raise Exception("Epic Fail Whale! - %s"%r.final_url)
 
-    def get_tweets(self, path, **kwargs):
-        timeline = self.get_d(
-            path,
-            trim_user=1,
-            include_rts=1,
-            include_entities=1,
-            **kwargs
-        )
-        tweets = [Tweet(status) for status in timeline]
-        for tweet in tweets:
-            tweet._id = tweet.id
-            tweet.mentions = [
-                as_local_id('U',at['id'])
-                for at in tweet.entities['user_mentions']]
-        return tweets
-
     def get_ids(self, path, user_id):
         ids=self.get_d(
             user_id=as_int_id(user_id)
@@ -86,17 +70,20 @@ class TwitterResource(Resource):
     def friends_ids(self, user_id):
         return self.get_ids("followers/ids.json", user_id)
 
-    #We can only pull mentions for the logged-in user.  Grr.
-    def mentions(self, user_id, **kwargs):
-        return self.get_tweets(
-            "statuses/mentions.json",
-            user_id=as_int_id(user_id)
-            **kwargs
-        )
-
     def user_timeline(self, user_id, **kwargs):
-        return self.get_tweets(
+        timeline = self.get_d(
             "statuses/user_timeline.json",
             user_id=as_int_id(user_id)
+            trim_user=1,
+            include_rts=1,
+            include_entities=1,
             **kwargs
         )
+        tweets = [Tweet(t) for t in timeline]
+        for tweet in tweets:
+            tweet._id = tweet.id
+            tweet.mentions = [
+                as_local_id('U', at['id'])
+                for at in tweet.entities['user_mentions']
+            ]
+        return tweets
