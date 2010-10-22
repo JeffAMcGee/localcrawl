@@ -23,7 +23,12 @@ class TwitterResource(Resource):
         url = "http://api.twitter.com/1/"
         auth = OAuthFilter('*', consumer, token)
         pool = SimplePool(keepalive=2)
-        Resource.__init__(self, url, filters=[auth], pool_instance=pool)
+        Resource.__init__(self,
+                url,
+                filters=[auth],
+                pool_instance=pool,
+                client_opts={'timeout':30}
+        )
 
     def get_d(self, path=None, headers=None, **kwargs):
         for delay in self.backoff_seconds:
@@ -43,7 +48,7 @@ class TwitterResource(Resource):
                         failure.response.status,
                         failure.response.final_url
                 )
-                if failure.response.status_int in (400,420,502,503):
+                if failure.response.status_int in (400,420):#,502,503):
                     # The whale says slow down!
                     delay = 240
                 time.sleep(delay)
@@ -64,7 +69,7 @@ class TwitterResource(Resource):
             user_id=ids,
             **kwargs
         )
-        return (User(d) for d in lookup)
+        return [User(d) for d in lookup]
 
     def friends_ids(self, user_id):
         return self.get_ids("friends/ids.json", user_id)
@@ -89,4 +94,4 @@ class TwitterResource(Resource):
             count=200,
             **kwargs
         )
-        return (Tweet(t) for t in timeline)
+        return [Tweet(t) for t in timeline]

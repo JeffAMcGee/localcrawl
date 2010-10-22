@@ -1,4 +1,7 @@
 import datetime
+import json
+from couchdbkit import ResourceConflict
+
 import maroon
 from maroon import *
 
@@ -16,7 +19,12 @@ class TwitterModel(Model):
         Model.__init__(self, from_dict, **kwargs)
         if self._id is None and 'id' in from_dict:
             self._id = from_dict['id']
-
+    
+    def attempt_save(self):
+        try:
+            self.save()
+        except ResourceConflict:
+            print "conflict on %s %s"%(self.__class__.__name__,self._id)
 
 class TwitterIdProperty(TextProperty):
     def __init__(self, name, prefix, **kwargs):
@@ -122,3 +130,13 @@ class JobBody(ModelPart):
     _id = TwitterIdProperty('_id','U')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
+
+    def put(self, stalk):
+        print "put %r"%self.to_d()
+        #import pdb; pdb.set_trace()
+        stalk.put(json.dumps(self.to_d()))
+
+    @classmethod
+    def from_job(cls, job):
+        print "reserve %s"%job.body
+        return JobBody(json.loads(job.body))
