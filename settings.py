@@ -13,7 +13,7 @@ settings = SettingsBunch(
     crawl_ratio = .1,
     brain_in = 'jeffamcgee.in',
     brain_out = 'brain.out',
-    beanstalk_ttr = 30,#3600
+    beanstalk_ttr = 3600,
 )
 
 try:

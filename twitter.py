@@ -4,6 +4,7 @@ import restkit.util.oauth2 as oauth
 import json
 import time
 import logging
+from datetime import datetime
 from restkit.errors import RequestFailed
 from settings import settings
 from models import Relationships, User, Tweet, as_local_id, as_int_id
@@ -33,11 +34,12 @@ class TwitterResource(Resource):
     def get_d(self, path=None, headers=None, **kwargs):
         for delay in self.backoff_seconds:
             try:
-                print "get %s with %r"%(path,kwargs)
                 r = self.get(path, headers, **kwargs)
                 if 'x-ratelimit-remaining' in r.headers:
                     self.remaining = int(r.headers['x-ratelimit-remaining'])
-                    print "requests left: %s"%self.remaining
+                    stamp = int(r.headers['x-ratelimit-reset'])
+                    self.reset_time = datetime.utcfromtimestamp(stamp)
+                    print "remaining: %d"%self.remaining
                 if r.status_int == 304:
                     # I don't think this should happen - that's
                     # why I raise the exception.

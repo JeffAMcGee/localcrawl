@@ -4,6 +4,8 @@ import json
 import pdb
 import signal
 from couchdbkit import ResourceConflict 
+from datetime import datetime
+import time
 
 import maroon
 from maroon import *
@@ -52,6 +54,10 @@ class UserCrawler():
             #get user_ids from beanstalk
             for job,body,user in zip(jobs,bodies,users):
                 try:
+                    if self.res.remaining < 30:
+                        dt = (self.res.reset_time-datetime.datetime.utcnow())
+                        print "goodnight for %r"%dt
+                        time.sleep(dt.seconds)
                     print "look at %s"%user.screen_name
                     if user._id in User.database:
                         job.delete()
@@ -82,6 +88,7 @@ class UserCrawler():
             rels.attempt_save()
         if user.statuses_count>0:
             tweets = self.res.user_timeline(user._id)
+            FIXME: why do we not store the id?
             for tweet in tweets:
                 tweet.attempt_save()
         

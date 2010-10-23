@@ -19,7 +19,7 @@ CRAWL_PROPORTION = .10
 
 
 HALT = False
-def set_halt():
+def set_halt(x,y):
     global HALT
     HALT=True
 signal.signal(signal.SIGINT, set_halt)
