@@ -33,9 +33,11 @@ class TwitterResource(Resource):
     def get_d(self, path=None, headers=None, **kwargs):
         for delay in self.backoff_seconds:
             try:
+                print "get %s with %r"%(path,kwargs)
                 r = self.get(path, headers, **kwargs)
                 if 'x-ratelimit-remaining' in r.headers:
-                    self.remaining = r.headers['x-ratelimit-remaining']
+                    self.remaining = int(r.headers['x-ratelimit-remaining'])
+                    print "requests left: %s"%self.remaining
                 if r.status_int == 304:
                     # I don't think this should happen - that's
                     # why I raise the exception.
@@ -48,7 +50,7 @@ class TwitterResource(Resource):
                         failure.response.status,
                         failure.response.final_url
                 )
-                if failure.response.status_int in (400,420):#,502,503):
+                if failure.response.status_int in (400,420,503):
                     # The whale says slow down!
                     delay = 240
                 time.sleep(delay)

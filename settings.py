@@ -6,9 +6,14 @@ class SettingsBunch(dict):
         self[name] = value
 
 settings = SettingsBunch(
-    couchdb = 'http://127.0.0.1:5984/jeff',
+    couchdb = 'http://127.0.0.1:5984/bcstx',
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
+    mention_weight = .5,
+    crawl_ratio = .1,
+    brain_in = 'jeffamcgee.in',
+    brain_out = 'brain.out',
+    beanstalk_ttr = 30,#3600
 )
 
 try:

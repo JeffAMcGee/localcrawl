@@ -16,7 +16,7 @@ from settings import settings
 RFRIEND_POINTS = 1000
 MENTION_POINTS = 1000
 
-signal.signal(signal.SIGINT, lambda x, y: pdb.set_trace())
+#signal.signal(signal.SIGINT, lambda x, y: pdb.set_trace())
 
 class UserCrawler():
     def __init__(self):
@@ -29,7 +29,9 @@ class UserCrawler():
         self.stalk.watch('lookup')
 
     def _local_guess(self,user):
-        "this is really stupid for now"
+        if not user.location:
+            return .5
+        #FIXME: this is for #bcstx
         loc = user.location.lower()
         for here in ('college station','bryan','aggieland'):
             if here in loc:
@@ -51,12 +53,15 @@ class UserCrawler():
             for job,body,user in zip(jobs,bodies,users):
                 try:
                     print "look at %s"%user.screen_name
+                    if user._id in User.database:
+                        job.delete()
+                        continue
                     user.local.rfriends_score = body.rfriends_score
                     user.local.mention_score = body.mention_score
                     self.crawl_user(user)
                     #FIXME - calc daily_tweets
                     user.local.daily_tweets = -1.0
-                    user.attempt_save()
+                    user.save()
                     job.delete()
                 except Exception as ex:
                     print ex
@@ -66,6 +71,9 @@ class UserCrawler():
     def crawl_user(self,user):
         user.local.local_prob = self._local_guess(user)
         if user.local.local_prob == 0 or user.protected:
+            return
+        if user.local.local_prob == .5:
+            #FIXME: this is only for the #bcstx crawl
             return
         rels=None
         tweets=None
@@ -82,6 +90,7 @@ class UserCrawler():
 
     def store_new_users(self, user, rels, tweets):
         jobs = defaultdict(JobBody)
+        jobs[user._id].done = True
 
         if rels:
             rfriends = rels.rfriends()
@@ -107,10 +116,6 @@ class UserCrawler():
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
-
-    #jeffamcgee and aggieastronaut
-    #users = ['U106582358','U17560063']
     crawler = UserCrawler()
     crawler.crawl()
-    #tweets = crawler.res.user_timeline('U106582358')
 

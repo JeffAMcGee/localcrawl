@@ -5,6 +5,8 @@ from couchdbkit import ResourceConflict
 import maroon
 from maroon import *
 
+from settings import settings
+
 
 def as_local_id(prefix,id):
     return "%c%d"%(prefix,id)
@@ -49,6 +51,7 @@ class LocalUser(ModelPart):
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     local_prob = EnumProperty('prob',[0,.5,1])
+    last_visit = CreatedAtProperty('vis')
 
 
 class User(TwitterModel):
@@ -130,11 +133,12 @@ class JobBody(ModelPart):
     _id = TwitterIdProperty('_id','U')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
+    done = BoolProperty('done')
 
     def put(self, stalk):
         print "put %r"%self.to_d()
         #import pdb; pdb.set_trace()
-        stalk.put(json.dumps(self.to_d()))
+        stalk.put(json.dumps(self.to_d()),ttr=settings.beanstalk_ttr)
 
     @classmethod
     def from_job(cls, job):
