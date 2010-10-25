@@ -12,5 +12,9 @@ build
 *.pyc
 *.db
 
+*.in
+*.out
+maroon
+
 settings_dev.py
 settings_prod.py
