@@ -138,13 +138,10 @@ class JobBody(ModelPart):
     done = BoolProperty('done')
 
     def put(self, stalk):
-        print "put %r"%self.to_d()
-        #import pdb; pdb.set_trace()
         stalk.put(json.dumps(self.to_d()),ttr=settings.beanstalk_ttr)
 
     @classmethod
     def from_job(cls, job):
-        print "reserve %s"%job.body
         return JobBody(json.loads(job.body))
 
 if __name__ == '__main__':

@@ -46,8 +46,9 @@ class UserCrawler():
     def crawl(self):
         while True:
             # reserve blocks to wait when x is 0, but returns None for 1-19
-            jobs = [self.stalk.reserve(0 if x else None) for x in xrange(20)]
-            bodies = [JobBody.from_job(j) for j in jobs if j is not None]
+            jobs = (self.stalk.reserve(0 if x else None) for x in xrange(20))
+            jobs = [j for j in jobs if j is not None]
+            bodies = [JobBody.from_job(j) for j in jobs]
             users =self.res.user_lookup([b._id for b in bodies])
 
             print "looking at %r"%[u.screen_name for u in users]

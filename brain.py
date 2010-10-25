@@ -41,7 +41,7 @@ class CrawlController():
         while True:
             print "read_scores"
             self.read_scores()
-            if HALT or len(self.scores>100000):
+            if HALT or len(self.scores)>100000:
                 self.scores.dump(settings.brain_out)
                 return
             print "calc_cutoff"
