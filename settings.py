@@ -7,11 +7,12 @@ class SettingsBunch(dict):
 
 settings = SettingsBunch(
     couchdb = 'http://127.0.0.1:5984/bcstx',
+    gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
     mention_weight = .5,
     crawl_ratio = .1,
-    brain_in = 'jeffamcgee.in',
+    brain_in = 'brain.in',
     brain_out = 'brain.out',
     beanstalk_ttr = 3600,
 )

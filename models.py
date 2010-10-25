@@ -92,6 +92,8 @@ class Tweet(TwitterModel):
 
     def __init__(self, from_dict=None, **kwargs):
         TwitterModel.__init__(self, from_dict, **kwargs)
+        if self.user_id is None and 'user' in from_dict:
+            self.user_id = as_local_id('U',from_dict['user']['id'])
         if self.mentions is None and 'entities' in from_dict:
             self.mentions = [
                 as_local_id('U', at['id'])
@@ -144,3 +146,8 @@ class JobBody(ModelPart):
     def from_job(cls, job):
         print "reserve %s"%job.body
         return JobBody(json.loads(job.body))
+
+if __name__ == '__main__':
+    global db
+    db = CouchDB(settings.couchdb,True)
+    Model.database = db

@@ -51,7 +51,7 @@ class Scores(defaultdict):
     def dump(self, path):
         with open(path,'w') as f:
             for u,s in self.iteritems():
-                print "%d\t%d"%(u,s)>>f
+                print >>f,"%d\t%d"%(u,s)
 
     def read(self, path):
         with open(path,'r') as f:

@@ -44,7 +44,7 @@ class UserCrawler():
         return .5
 
     def crawl(self):
-        while True:
+        #while True:
             # reserve blocks to wait when x is 0, but returns None for 1-19
             jobs = [self.stalk.reserve(0 if x else None) for x in xrange(20)]
             bodies = [JobBody.from_job(j) for j in jobs if j is not None]
@@ -88,7 +88,6 @@ class UserCrawler():
             rels.attempt_save()
         if user.statuses_count>0:
             tweets = self.res.user_timeline(user._id)
-            FIXME: why do we not store the id?
             for tweet in tweets:
                 tweet.attempt_save()
         
