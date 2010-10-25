@@ -44,7 +44,7 @@ class UserCrawler():
         return .5
 
     def crawl(self):
-        #while True:
+        while True:
             # reserve blocks to wait when x is 0, but returns None for 1-19
             jobs = [self.stalk.reserve(0 if x else None) for x in xrange(20)]
             bodies = [JobBody.from_job(j) for j in jobs if j is not None]
