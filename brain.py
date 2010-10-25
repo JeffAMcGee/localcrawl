@@ -107,5 +107,6 @@ if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     controller = CrawlController()
     controller.scores.read(settings.brain_in)
+    controller.lookup = controller.scores.count_lookups()
     controller.launch()
 

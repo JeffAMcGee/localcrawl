@@ -58,3 +58,7 @@ class Scores(defaultdict):
             for line in f:
                 k,v = [int(s) for s in line.strip().split('\t')]
                 self[k]=v
+
+    def count_lookups(self):
+        return sum(1 for v in self.itervalues() if v/STATE_FIELD)
+

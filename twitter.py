@@ -39,7 +39,6 @@ class TwitterResource(Resource):
                     self.remaining = int(r.headers['x-ratelimit-remaining'])
                     stamp = int(r.headers['x-ratelimit-reset'])
                     self.reset_time = datetime.utcfromtimestamp(stamp)
-                    print "remaining: %d"%self.remaining
                 if r.status_int == 304:
                     # I don't think this should happen - that's
                     # why I raise the exception.

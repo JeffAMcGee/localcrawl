@@ -74,6 +74,7 @@ class UserCrawler():
                     print ex
                     pdb.post_mortem()
                     job.bury()
+            print "api calls remaining: %d"%self.res.remaining
 
     def crawl_user(self,user):
         user.local.local_prob = self._local_guess(user)
