@@ -3,12 +3,13 @@
 
 from couchdbkit.loaders import FileSystemDocsLoader
 from models import *
+import json
 import beanstalkc
 from settings import settings
 
 db = CouchDB(settings.couchdb,True)
 Model.database = db
-c = beanstalkc.Connection()
+#c = beanstalkc.Connection()
 
 def reload_design():
     loader = FileSystemDocsLoader('_design')
@@ -23,3 +24,9 @@ def clear(tube):
         print j.body
         j.delete()
 
+def couch_import(path):
+    data = json.load(open(path))
+    for row in data['rows']:
+        d = row['doc']
+        del d['_rev']
+        db.save_doc(d)
