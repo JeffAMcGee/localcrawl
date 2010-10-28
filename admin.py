@@ -6,12 +6,13 @@ from models import *
 import json
 import beanstalkc
 from settings import settings
+from collections import defaultdict
 
 db = CouchDB(settings.couchdb,True)
 Model.database = db
-#c = beanstalkc.Connection()
+c = beanstalkc.Connection()
 
-def reload_design():
+def design_sync():
     loader = FileSystemDocsLoader('_design')
     loader.sync(db, verbose=True)
 
@@ -30,3 +31,21 @@ def couch_import(path):
         d = row['doc']
         del d['_rev']
         db.save_doc(d)
+
+def print_counts():
+    counts = defaultdict(lambda: defaultdict(int))
+
+    res = db.view('user/all',include_docs=True)
+    for d in res:
+        for k,v in d['doc'].iteritems():
+            if k != 'l' and not isinstance(v,list):
+                counts[k][v]+=1
+        for k,v in d['doc']['l'].iteritems():
+            if not isinstance(v,list):
+                counts[k][v]+=1
+
+    for k,d in counts.iteritems():
+        print k
+        for v in sorted(d.keys()):
+            print "%d\t%r"%(d[v],v)
+        print
