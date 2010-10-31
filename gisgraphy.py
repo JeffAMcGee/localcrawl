@@ -15,7 +15,12 @@ class GisgraphyResource(Resource):
 
     def fulltext(self, q, headers=None, **kwargs):
         try:
-            r = self.get('fulltext/fulltextsearch', headers, q=q, format="json", **kwargs)
+            #we make the query lower case as workaround for "Portland, OR"
+            r = self.get('fulltext/fulltextsearch',
+                headers,
+                q=q.lower(),
+                format="json",
+                **kwargs)
             return json.loads(r.body_string())["response"]["docs"]
         except RequestFailed as failure:
             print "%d while retieving url!"%failure.response.status_int

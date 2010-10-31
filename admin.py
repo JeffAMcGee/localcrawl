@@ -7,10 +7,16 @@ import json
 import beanstalkc
 from settings import settings
 from collections import defaultdict
+import twitter
 
 db = CouchDB(settings.couchdb,True)
+res = twitter.TwitterResource()
 Model.database = db
 c = beanstalkc.Connection()
+
+def connect(name):
+    Model.database = CouchDB('http://127.0.0.1:5984/'+name,True)
+    return Model.database
 
 def design_sync():
     loader = FileSystemDocsLoader('_design')

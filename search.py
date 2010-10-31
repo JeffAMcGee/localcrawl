@@ -125,5 +125,6 @@ class UserCrawler():
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     crawler = UserCrawler()
-    crawler.crawl()
+    #crawler.crawl()
+
 

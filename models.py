@@ -48,10 +48,12 @@ class TwitterDateTimeProperty(DateTimeProperty):
 
 class LocalUser(ModelPart):
     daily_tweets = FloatProperty('dt')
+    next_crawl_date = DateTimeProperty('ncd')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     local_prob = EnumProperty('prob',[0,.5,1])
     last_visit = CreatedAtProperty('vis')
+    geoname_loc = Property('gnl')
 
 
 class User(TwitterModel):
