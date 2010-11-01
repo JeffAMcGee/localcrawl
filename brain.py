@@ -2,6 +2,7 @@ import json
 import signal
 import time
 from math import log
+import sys
 
 import beanstalkc
 from couchdbkit import ResourceConflict 
@@ -26,18 +27,18 @@ signal.signal(signal.SIGINT, set_halt)
 signal.signal(signal.SIGUSR1, set_halt)
 
 
-class CrawlController():
+class Brain():
     def __init__(self):
         self.stalk = beanstalkc.Connection(
                 settings.beanstalk_host,
                 settings.beanstalk_port,
                 )
-        self.stalk.use('lookup')
-        self.stalk.watch('score')
         self.scores = Scores()
         self.lookups = 0
 
-    def launch(self):
+    def lookup(self):
+        self.stalk.use('lookup')
+        self.stalk.watch('score')
         while True:
             print "read_scores"
             self.read_scores()
@@ -102,11 +103,27 @@ class CrawlController():
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
+    def fix(self):
+        db = Model.database
+        for u in db.paged_vie
+            store value of rts vs ats
+        for u in user.screen_name:
+            update local_prob
+        
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
-    controller = CrawlController()
-    controller.scores.read(settings.brain_in)
-    controller.lookups = controller.scores.count_lookups()
-    controller.launch()
+    brain = Brain()
+    brain.scores.read(settings.brain_in)
+    brain.lookups = controller.scores.count_lookups()
+    if sys.argv[1] == 'lookup':
+        brain.lookup()
+    elif sys.argv[1] == 'prep':
+        brain.prep()
+    elif sys.argv[1] == 'crawl':
+        brain.crawl()
+    elif sys.argv[1] == 'fix':
+        brain.fix()
+    else:
+        print "brain.py [lookup|prep|crawl]"
 

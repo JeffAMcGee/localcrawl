@@ -45,15 +45,21 @@ class TwitterDateTimeProperty(DateTimeProperty):
         format="%a %b %d %H:%M:%S +0000 %Y"
         DateTimeProperty.__init__(self, name, format, **kwargs)
 
+class GeonamesPlace(ModelPart):
+    lat = FloatProperty('lat')
+    lng = FloatProperty('lng')
+    feature_code = TextProperty('code')
+    name = TextProperty('name')
+    population = IntProperty('pop')
 
 class LocalUser(ModelPart):
-    daily_tweets = FloatProperty('dt')
+    tweets_per_hour = FloatProperty('tph')
+    lookup_done = BoolProperty('ld')
     next_crawl_date = DateTimeProperty('ncd')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
-    local_prob = EnumProperty('prob',[0,.5,1])
-    last_visit = CreatedAtProperty('vis')
-    geoname_loc = Property('gnl')
+    local_prob = FloatProperty('prob')
+    geonames_place = ModelProperty('gnp',GeonamesPlace)
 
 
 class User(TwitterModel):

@@ -6,6 +6,7 @@ class SettingsBunch(dict):
         self[name] = value
 
 settings = SettingsBunch(
+    local_box = dict(lat=(30.5,31),lng=(-96.5,-96)),
     couchdb = 'http://127.0.0.1:5984/bcstx',
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',

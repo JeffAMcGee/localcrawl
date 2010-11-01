@@ -6,6 +6,7 @@ import signal
 from couchdbkit import ResourceConflict 
 from datetime import datetime
 import time
+from itertools import groupby
 
 import maroon
 from maroon import *
@@ -13,6 +14,7 @@ from maroon import *
 from models import Relationships, User, Tweet, JobBody, as_local_id, as_int_id
 from twitter import TwitterResource
 from settings import settings
+from gisgraphy import GisgraphyResource
 
 
 RFRIEND_POINTS = 1000
@@ -29,19 +31,16 @@ class UserCrawler():
                 )
         self.stalk.use('score')
         self.stalk.watch('lookup')
+        self.gisgraphy = GisgraphyResource()
 
-    def _local_guess(self,user):
+    def _guess_location(self,user):
         if not user.location:
             return .5
-        #FIXME: this is for #bcstx
-        loc = user.location.lower()
-        for here in ('college station','bryan','aggieland'):
-            if here in loc:
-                return 1.0
-        for here in ('austin','dallas'):
-            if here in loc:
-                return 0.0
-        return .5
+        place = self.gisgraphy.twitter_loc(user.location)
+        if not place:
+            return .5
+        user.local.geonames_place = place
+        return 1 if self.gisgraphy.in_local_box(place.to_d()) else 0
 
     def crawl(self):
         while True:
@@ -121,10 +120,20 @@ class UserCrawler():
             j._id = k
             j.put(self.stalk)
 
+    def fixup(self):
+        view = Model.database.paged_view('user/screen_name',include_docs=True,startkey='allenmireles')
+        for user in (User(d['doc']) for d in view):
+            user.local.lookup_done = (user.local.local_prob == 1.0)
+            user.local.local_prob = self._guess_location(user)
+            user.local.tweets_per_hour = .04 # 1 tweet/day is about the median
+            user.local.next_crawl_date = datetime.utcnow()
+            user.save()
+
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     crawler = UserCrawler()
+    crawler.fixup()
     #crawler.crawl()
 
 
