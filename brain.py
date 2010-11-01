@@ -103,13 +103,14 @@ class Brain():
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
     def prep(self):
+        locs = (0,.5,1)
         weights =(0,settings.mention_weight,1) 
         counts = dict(
             (score, dict(
                 (loc, dict(
                     (weight,0) 
                     for weight in weights))
-                for loc in (0,1)))
+                for loc in locs))
             for score in xrange(BUCKETS))
         view = Model.database.paged_view('user/screen_name',include_docs=True)
         for user in (User(d['doc']) for d in view):
@@ -118,19 +119,21 @@ class Brain():
             #user.local.rfriends_score = rfs
             #user.local.mention_score = ats
             #user.save()
-            if user.local.local_prob in (0,1):
+            if user.local.local_prob in locs:
                 for weight in weights:
                     score = log_score(rfs,ats,weight)
                     counts[score][user.local.local_prob][weight]+=1
 
-        print "\tnon\t\t\tlocal"
-        print "\trfs\tavg\tats\trfs\tavg\tats"
+        print "\tnon\t\t\tunk\t\t\tlocal"
+        print "\trfs\tavg\tats\trfs\tavg\tats\trfs\tavg\tats\ttot"
         for score in xrange(BUCKETS):
             print score,
-            for loc in (0,1):
+            for loc in locs:
                 for weight in weights:
                     print "\t%d"%counts[score][loc][weight],
-            print
+            print "\t%d"%sum(
+                counts[score][loc][settings.mention_weight]
+                for loc in locs)
 
 
 if __name__ == '__main__':
