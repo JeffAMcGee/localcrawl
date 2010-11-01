@@ -55,18 +55,18 @@ class UserCrawler():
             for job,body,user in zip(jobs,bodies,users):
                 try:
                     if self.res.remaining < 30:
-                        dt = (self.res.reset_time-datetime.datetime.utcnow())
+                        dt = (self.res.reset_time-datetime.utcnow())
                         print "goodnight for %r"%dt
                         time.sleep(dt.seconds)
                     print "look at %s"%user.screen_name
                     if user._id in User.database:
                         job.delete()
                         continue
+                    self.crawl_user(user)
                     user.local.rfriends_score = body.rfriends_score
                     user.local.mention_score = body.mention_score
-                    self.crawl_user(user)
-                    #FIXME - calc daily_tweets
-                    user.local.daily_tweets = -1.0
+                    user.local.tweets_per_hour = .04 # 1 tweet/day is median
+                    user.local.next_crawl_date = datetime.utcnow()
                     user.save()
                     job.delete()
                 except Exception as ex:
@@ -76,7 +76,7 @@ class UserCrawler():
             print "api calls remaining: %d"%self.res.remaining
 
     def crawl_user(self,user):
-        user.local.local_prob = self._local_guess(user)
+        user.local.local_prob = self._guess_location(user)
         if user.local.local_prob == 0 or user.protected:
             return
         if user.local.local_prob == .5:
@@ -92,10 +92,11 @@ class UserCrawler():
             for tweet in tweets:
                 tweet.attempt_save()
         
+        user.local.lookup_done = True
         if user.local.local_prob == 1.0:
-            self.store_new_users(user, rels, tweets)
+            self.score_new_users(user, rels, tweets)
 
-    def store_new_users(self, user, rels, tweets):
+    def score_new_users(self, user, rels, tweets):
         jobs = defaultdict(JobBody)
         jobs[user._id].done = True
 
@@ -120,15 +121,10 @@ class UserCrawler():
             j._id = k
             j.put(self.stalk)
 
-    def fixup(self):
-        view = Model.database.paged_view('user/screen_name',include_docs=True,startkey='perfectgirlLULU')
-        for user in (User(d['doc']) for d in view):
-            print user.screen_name
-            user.local.lookup_done = (user.local.local_prob == 1.0)
-            user.local.local_prob = self._guess_location(user)
-            user.local.tweets_per_hour = .04 # 1 tweet/day is about the median
-            user.local.next_crawl_date = datetime.utcnow()
-            user.save()
+    #def fixup(self):
+        #view = Model.database.paged_view('user/screen_name',include_docs=True)
+        #for user in (User(d['doc']) for d in view):
+            #user.save()
 
 
 if __name__ == '__main__':
