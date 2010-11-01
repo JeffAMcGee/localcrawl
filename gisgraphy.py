@@ -28,9 +28,9 @@ class GisgraphyResource(Resource):
             **kwargs)
         return json.loads(r.body_string())["response"]["docs"]
 
-
     def twitter_loc(self, q):
-        q = ''.join(re.split('[|&!]',q.lower().strip().replace('-','/')))
+        q = q.lower().strip().replace('-','/').replace(',',', ')
+        q = ''.join(re.split('[|&!]',q))
         if not q:
             return None
         # check for "30.639, -96.347" style coordinates
@@ -50,19 +50,21 @@ class GisgraphyResource(Resource):
         if len(results)>0:
             return GeonamesPlace(results[0])
         # try splitting q in half
-        for splitter in ('/','and','or'):
+        found = None
+        for splitter in ('and','or','/'):
             parts = q.split(splitter)
             if len(parts)==2:
                 for part in parts:
                     res = self.twitter_loc(part)
-                    if res:
+                    if self.in_local_box(res.to_d()):
                         return res
-        return None
+                    if res:
+                        found = res
+        return found
 
     def in_local_box(self, place):
         box = settings.local_box
         return all(box[d][0]<place[d]<box[d][1] for d in ('lat','lng'))
-
 
 if __name__ == '__main__':
     res = GisgraphyResource()
