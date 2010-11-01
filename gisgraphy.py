@@ -22,7 +22,7 @@ class GisgraphyResource(Resource):
         #we make the query lower case as workaround for "Portland, OR"
         r = self.get('fulltext/fulltextsearch',
             headers,
-            q=q.strip(),
+            q=q,
             format="json",
             spellchecking=False,
             **kwargs)
@@ -30,9 +30,9 @@ class GisgraphyResource(Resource):
 
 
     def twitter_loc(self, q):
+        q = ''.join(re.split('[|&!]',q.lower().strip().replace('-','/')))
         if not q:
             return None
-        q = q.lower()
         # check for "30.639, -96.347" style coordinates
         match = self.COORD_RE.search(q)
         if match:
@@ -50,7 +50,7 @@ class GisgraphyResource(Resource):
         if len(results)>0:
             return GeonamesPlace(results[0])
         # try splitting q in half
-        for splitter in ('/','-','and','or'):
+        for splitter in ('/','and','or'):
             parts = q.split(splitter)
             if len(parts)==2:
                 for part in parts:

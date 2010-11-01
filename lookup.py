@@ -121,8 +121,9 @@ class UserCrawler():
             j.put(self.stalk)
 
     def fixup(self):
-        view = Model.database.paged_view('user/screen_name',include_docs=True,startkey='allenmireles')
+        view = Model.database.paged_view('user/screen_name',include_docs=True,startkey='perfectgirlLULU')
         for user in (User(d['doc']) for d in view):
+            print user.screen_name
             user.local.lookup_done = (user.local.local_prob == 1.0)
             user.local.local_prob = self._guess_location(user)
             user.local.tweets_per_hour = .04 # 1 tweet/day is about the median
