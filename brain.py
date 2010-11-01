@@ -103,27 +103,18 @@ class Brain():
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
-    def fix(self):
-        db = Model.database
-        for u in db.paged_vie
-            store value of rts vs ats
-        for u in user.screen_name:
-            update local_prob
-        
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     brain = Brain()
     brain.scores.read(settings.brain_in)
-    brain.lookups = controller.scores.count_lookups()
+    brain.lookups = brain.scores.count_lookups()
     if sys.argv[1] == 'lookup':
         brain.lookup()
     elif sys.argv[1] == 'prep':
         brain.prep()
     elif sys.argv[1] == 'crawl':
         brain.crawl()
-    elif sys.argv[1] == 'fix':
-        brain.fix()
     else:
         print "brain.py [lookup|prep|crawl]"
 
