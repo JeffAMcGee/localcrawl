@@ -144,6 +144,7 @@ class JobBody(ModelPart):
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     done = BoolProperty('done')
+    force = BoolProperty('force')
 
     def put(self, stalk):
         stalk.put(json.dumps(self.to_d()),ttr=settings.beanstalk_ttr)

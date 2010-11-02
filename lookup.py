@@ -65,7 +65,7 @@ class UserCrawler():
                     self.crawl_user(user)
                     user.local.rfriends_score = body.rfriends_score
                     user.local.mention_score = body.mention_score
-                    user.local.tweets_per_hour = .04 # 1 tweet/day is median
+                    user.local.tweets_per_hour = settings.tweets_per_hour
                     user.local.next_crawl_date = datetime.utcnow()
                     user.save()
                     job.delete()
@@ -77,10 +77,7 @@ class UserCrawler():
 
     def crawl_user(self,user):
         user.local.local_prob = self._guess_location(user)
-        if user.local.local_prob == 0 or user.protected:
-            return
-        if user.local.local_prob == .5:
-            #FIXME: this is only for the #bcstx crawl
+        if user.local.local_prob != 1.0 or user.protected:
             return
         rels=None
         tweets=None

@@ -13,9 +13,11 @@ settings = SettingsBunch(
     beanstalk_port = 11300,
     mention_weight = .5,
     crawl_ratio = .1,
+    force_cutoff = 8,
     brain_in = 'brain.in',
     brain_out = 'brain.out',
     beanstalk_ttr = 3600,
+    tweets_per_hour = .04 # 1 tweet/day is median
 )
 
 try:

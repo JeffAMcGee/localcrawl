@@ -102,7 +102,7 @@ class Brain():
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
-    def prep(self):
+    def analyze(self):
         locs = (0,.5,1)
         weights =(0,settings.mention_weight,1) 
         counts = dict(
@@ -112,6 +112,7 @@ class Brain():
                     for weight in weights))
                 for loc in locs))
             for score in xrange(BUCKETS))
+
         view = Model.database.paged_view('user/screen_name',include_docs=True)
         for user in (User(d['doc']) for d in view):
             user.local.local_prob
@@ -135,6 +136,27 @@ class Brain():
                 counts[score][loc][settings.mention_weight]
                 for loc in locs)
 
+    def force_lookup(self):
+        #ratio of locals to non-locals taken from a spreadsheet
+        probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
+        view = Model.database.paged_view('user/screen_name',include_docs=True)
+        res = TwitterResource()
+        for user in (User(d['doc']) for d in view):
+            if user.local.local_prob != 1:
+                score = log_score(user.rfriends_score, user.mention_score)
+                if( user.local.local_prob==.5
+                    and score >= settings.force_cutoff
+                    and not user.local.lookup_done
+                ):
+                    user.local.tweets_per_hour = settings.tweets_per_hour
+                    user.local.next_crawl_date = datetime.utcnow()
+                    user.local.lookup_done = True
+                    for tweet in res.user_timeline(user._id):
+                        tweet.attempt_save()
+                user.local.local_prob = probs[score]
+                user.save()
+
+    #def crawl(self):
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
@@ -143,8 +165,10 @@ if __name__ == '__main__':
     brain.lookups = brain.scores.count_lookups()
     if sys.argv[1] == 'lookup':
         brain.lookup()
-    elif sys.argv[1] == 'prep':
-        brain.prep()
+    elif sys.argv[1] == 'analyze':
+        brain.analyze()
+    elif sys.argv[1] == 'force':
+        brain.force()
     elif sys.argv[1] == 'crawl':
         brain.crawl()
     else:
