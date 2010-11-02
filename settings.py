@@ -17,7 +17,9 @@ settings = SettingsBunch(
     brain_in = 'brain.in',
     brain_out = 'brain.out',
     beanstalk_ttr = 3600,
-    tweets_per_hour = .04 # 1 tweet/day is median
+    tweets_per_hour = .04, # 1 tweet/day is median
+    tweets_per_crawl = 20,
+    max_hours = 100,
 )
 
 try:

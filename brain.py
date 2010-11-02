@@ -3,6 +3,7 @@ import signal
 import time
 from math import log
 import sys
+from datetime import datetime, timedelta
 
 import beanstalkc
 from couchdbkit import ResourceConflict 
@@ -42,7 +43,7 @@ class Brain():
         while True:
             print "read_scores"
             self.read_scores()
-            if HALT or len(self.scores)>100000:
+            if HALT or len(self.scores)>10000:
                 self.scores.dump(settings.brain_out)
                 return
             print "calc_cutoff"
@@ -156,7 +157,58 @@ class Brain():
                 user.local.local_prob = probs[score]
                 user.save()
 
-    #def crawl(self):
+    def crawl(self):
+        self.stalk.use('crawl')
+        self.stalk.watch('crawled')
+        waiting = dict()
+        while not HALT:
+            print "queue_crawl"
+            self.queue_crawl(waiting)
+            print len(waiting)
+            while len(waiting)>100:
+                print "read_crawled %d"%len(waiting)
+                self.read_crawled(waiting)
+        while waiting:
+            print "read_crawled after HALT %d"%len(waiting)
+            self.read_crawled(waiting)
+
+    def queue_crawl(self, waiting):
+        endkey = datetime.utcnow().timetuple()[0:6]
+        view = Model.database.paged_view('user/next_crawl', endkey=endkey)
+        for user in view:
+            uid = user['id']
+            if uid in waiting:
+                continue
+            latest = Model.database.view('user/latest', key=uid)
+            if not len(latest):
+                continue # we only pull tweets from users who have tweeted before
+            value = latest.one()['value']
+            waiting[uid] = datetime(*value[1])
+            d = dict(uid=uid,since_id=value[0])
+            self.stalk.put(json.dumps(d),ttr=settings.beanstalk_ttr)
+
+            #FIXME: Only for testing!
+            if len(waiting)>110:
+                return
+
+    def read_crawled(self, waiting):
+        while True:
+            job = self.stalk.reserve(60)
+            if job is None:
+                return
+            d = json.loads(job.body)
+            user = User.get_id(d['uid'])
+            count = d['count']
+            now = datetime.now()
+            delta = now - waiting[user._id]
+            seconds = delta.seconds + delta.days*24*3600
+            tph = (3600.0*count/seconds + user.local.tweets_per_hour)/2
+            user.local.tweets_per_hour = tph
+            hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
+            user.local.next_crawl_date = now+timedelta(hours=hours)
+            del waiting[user._id]
+            user.save()
+
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)

@@ -48,8 +48,8 @@ class UserCrawler():
             print "api calls remaining: %d"%self.res.remaining
 
     def _crawl_job(self, job):
-        uid = job['_id']
-        since_id = as_int_id(job['latest'])-1
+        uid = job['uid']
+        since_id = as_int_id(job['since_id'])-1
         print "crawl %s"%uid
 
         count = 0
@@ -65,20 +65,18 @@ class UserCrawler():
             for tweet in tweets:
                 if as_int_id(tweet._id)-1>since_id:
                     tweet.save()
-                    if not len(tweets):
-            print "no tweets found!"
+            if not len(tweets):
+                print "no tweets found!"
 
         print "saved %d"%count
         return dict(
             _id = uid,
             count = count,
-            now = datetime.utcnow().timetuple()[0:6]
         )
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     crawler = UserCrawler()
-    crawler.fixup()
-    #crawler.crawl()
+    crawler.crawl()
 
 
