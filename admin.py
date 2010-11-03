@@ -73,6 +73,5 @@ def rm_local():
             user['doc'].update(user['doc']['l'])
             del user['doc']['l']
             db.save_doc(user['doc'])
-    design_sync()
 
 
