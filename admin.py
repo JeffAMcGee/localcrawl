@@ -15,24 +15,22 @@ Model.database = db
 c = beanstalkc.Connection()
 
 def connect(name):
+    "connect to the couchdb database on localhost named name"
     Model.database = CouchDB('http://127.0.0.1:5984/'+name,True)
     return Model.database
 
+
 def design_sync():
+    "sync the documents in _design"
     loader = FileSystemDocsLoader('_design')
     loader.sync(db, verbose=True)
 
-def couch_import(path):
-    data = json.load(open(path))
-    for row in data['rows']:
-        d = row['doc']
-        del d['_rev']
-        db.save_doc(d)
 
 def print_counts():
+    "determine how unique a key is - don't try to use this on a big dataset!"
     counts = defaultdict(lambda: defaultdict(int))
 
-    res = db.view('user/all',include_docs=True)
+    res = db.view('user/screen_name',include_docs=True)
     for d in res:
         for k,v in d['doc'].iteritems():
             if not isinstance(v,list):
@@ -45,6 +43,8 @@ def print_counts():
         print
 
 def rm_next_crawl():
+    """Remove the next_crawl_date field if it shouldn't be there.  This
+    code is no longer needed."""
     latest = db.view('user/latest',group=True)
     latest = set(l['key'] for l in latest)
     for user in db.paged_view('user/next_crawl',include_docs=True):
@@ -53,6 +53,8 @@ def rm_next_crawl():
             db.save_doc(user['doc'])
 
 def make_jeff_db():
+    """Make a subset of 1% of the database - user docs and tweets for users
+    whose user_id ends in 58 (i.e. @JeffAMcGee)"""
     jeff = CouchDB('http://127.0.0.1:5984/jeff',True)
     for row in db.paged_view('user/and_tweets',include_docs=True):
         if row['key'][0][-2:] == '58':
@@ -60,6 +62,8 @@ def make_jeff_db():
 
 
 def rm_local():
+    "Move everything in the local property into the user.  This code is no
+    longer needed."
     for user in db.paged_view('user/screen_name',include_docs=True):
         if 'l' in user['doc']:
             user['doc'].update(user['doc']['l'])
@@ -68,6 +72,7 @@ def rm_local():
 
 
 def analyze():
+    "Find out how the scoring algorithm did."
     scores = Scores()
     scores.read(settings.brain_in)
     locs = (0,.5,1)
@@ -88,7 +93,7 @@ def analyze():
         user.mention_score = ats
         user.save()
         if user.local_prob in locs:
-            for weight in weights:
+            for weight in weights:e
                 score = log_score(rfs,ats,weight)
                 counts[score][user.local_prob][weight]+=1
 
@@ -105,7 +110,9 @@ def analyze():
 
 
 def force_lookup():
-    #ratio of locals to non-locals taken from a spreadsheet
+    "Lookup users who were not included in the original crawl."
+    # FIXME: ratio of locals to non-locals taken from a spreadsheet - it
+    # should come from analyze()!
     probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
     view = Model.database.paged_view('user/screen_name',include_docs=True)
     res = TwitterResource()
