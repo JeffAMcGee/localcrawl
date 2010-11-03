@@ -34,8 +34,7 @@ class UserCrawler():
         while True:
             try:
                 job = self.stalk.reserve(None)
-                d = self._crawl_job(json.loads(job.body))
-                print d
+                d = self._crawl_job(job)
                 self.stalk.put(json.dumps(d),ttr=settings.crawl_ttr)
                 job.delete()
 
@@ -50,8 +49,10 @@ class UserCrawler():
             print "api calls remaining: %d"%self.res.remaining
 
     def _crawl_job(self, job):
-        uid = job['uid']
-        since_id = as_int_id(job['since_id'])-1
+        d = json.loads(job.body)
+        uid = d['uid']
+        since_id = as_int_id(d['since_id'])-1
+        print d
 
         count = 0
         max_id = None
@@ -68,6 +69,7 @@ class UserCrawler():
             if not tweets:
                 print "no tweets found after %d"%count
                 break
+            job.touch()
             count+=len(tweets)
             max_id =as_int_id(tweets[-1]._id)-1
             for tweet in tweets:

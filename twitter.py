@@ -30,6 +30,7 @@ class TwitterResource(Resource):
                 pool_instance=pool,
                 client_opts={'timeout':30}
         )
+        self.remaining = 10000
 
     def get_d(self, path=None, headers=None, **kwargs):
         for delay in self.backoff_seconds:
