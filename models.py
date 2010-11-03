@@ -53,15 +53,7 @@ class GeonamesPlace(ModelPart):
     population = IntProperty('pop')
 
 class User(TwitterModel):
-    #contributors_enabled, follow_request_sent, following,
-    #profile_background_color, profile_background_image_url,
-    #profile_background_tile, , profile_link_color,
-    #profile_sidebar_border_color, profile_sidebar_fill_color,
-    #profile_text_color, profile_use_background_image,
-    #show_all_inline_media, time_zone, status, notifications,
-
     _id = TwitterIdProperty('_id','U')
-    #local = ModelProperty('l',LocalUser)
 
     #local properties
     tweets_per_hour = FloatProperty('tph')
@@ -93,20 +85,6 @@ class User(TwitterModel):
 
 
 class Tweet(TwitterModel):
-    #contributors, entities, in_reply_to_screen_name, source,
-    #truncated, user, id, retweeted, retweeted_status,
-    #retweeted_count
-
-    def __init__(self, from_dict=None, **kwargs):
-        TwitterModel.__init__(self, from_dict, **kwargs)
-        if self.user_id is None and 'user' in from_dict:
-            self.user_id = as_local_id('U',from_dict['user']['id'])
-        if self.mentions is None and 'entities' in from_dict:
-            self.mentions = [
-                as_local_id('U', at['id'])
-                for at in from_dict['entities']['user_mentions']
-            ]
-
     _id = TwitterIdProperty('_id','T')
     mentions = SlugListProperty('ats') #based on entities
 
@@ -120,6 +98,17 @@ class Tweet(TwitterModel):
     place = Property('plc')
     text = TextProperty('tx')
     user_id = TwitterIdProperty('uid','U')
+
+    def __init__(self, from_dict=None, **kwargs):
+        TwitterModel.__init__(self, from_dict, **kwargs)
+        if self.user_id is None and 'user' in from_dict:
+            self.user_id = as_local_id('U',from_dict['user']['id'])
+        if self.mentions is None and 'entities' in from_dict:
+            self.mentions = [
+                as_local_id('U', at['id'])
+                for at in from_dict['entities']['user_mentions']
+            ]
+
 
 class Relationships(TwitterModel):
     # I only stored the first 5000 friends and followers

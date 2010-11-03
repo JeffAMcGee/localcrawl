@@ -44,6 +44,7 @@ class Brain():
         while True:
             print "read_scores"
             self.read_scores()
+            #FIXME: it stops at 10000 scores for debuging
             if HALT or len(self.scores)>10000:
                 self.scores.dump(settings.brain_out)
                 return
@@ -104,6 +105,7 @@ class Brain():
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
+    #FIXME: move to admin
     def analyze(self):
         locs = (0,.5,1)
         weights =(0,settings.mention_weight,1) 
@@ -138,6 +140,7 @@ class Brain():
                 counts[score][loc][settings.mention_weight]
                 for loc in locs)
 
+    #FIXME: move to admin
     def force_lookup(self):
         #ratio of locals to non-locals taken from a spreadsheet
         probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
@@ -178,17 +181,14 @@ class Brain():
                 traceback.print_exc()
 
     def queue_crawl(self, waiting):
-        endkey = datetime.utcnow().timetuple()[0:6]
-        view = Model.database.paged_view('user/next_crawl', endkey=endkey)
+        now = datetime.utcnow().timetuple()[0:6]
+        view = Model.database.paged_view('user/next_crawl', endkey=now)
         for user in view:
-            if len(waiting)>100:
-                return
+            if len(waiting)>500: return # let the queue empty a bit
             uid = user['id']
-            if uid in waiting:
-                continue
+            if uid in waiting: continue # they are queued
             latest = Model.database.view('user/latest', key=uid)
-            if not len(latest):
-                continue # we only pull tweets from users who have tweeted before
+            if not len(latest): continue # they have never tweeted
             value = latest.one()['value']
             waiting[uid] = datetime(*value[1])
             d = dict(uid=uid,since_id=value[0])
@@ -196,24 +196,22 @@ class Brain():
 
 
     def read_crawled(self, waiting):
-        while True:
-            job = self.stalk.reserve(60)
-            if job is None:
-                return
+        job = self.stalk.reserve(60)
+        while job is not None:
             d = json.loads(job.body)
             print d
             user = User.get_id(d['uid'])
-            count = d['count']
             now = datetime.utcnow()
             delta = now - waiting[user._id]
             seconds = delta.seconds + delta.days*24*3600
-            tph = (3600.0*count/seconds + user.tweets_per_hour)/2
+            tph = (3600.0*d['count']/seconds + user.tweets_per_hour)/2
             user.tweets_per_hour = tph
             hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
             user.next_crawl_date = now+timedelta(hours=hours)
             del waiting[user._id]
             user.save()
             job.delete()
+            job = self.stalk.reserve(60)
 
 
 if __name__ == '__main__':
@@ -223,10 +221,6 @@ if __name__ == '__main__':
     brain.lookups = brain.scores.count_lookups()
     if sys.argv[1] == 'lookup':
         brain.lookup()
-    elif sys.argv[1] == 'analyze':
-        brain.analyze()
-    elif sys.argv[1] == 'force':
-        brain.force()
     elif sys.argv[1] == 'crawl':
         brain.crawl()
     else:

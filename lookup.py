@@ -65,7 +65,6 @@ class UserCrawler():
                     self.crawl_user(user)
                     user.rfriends_score = body.rfriends_score
                     user.mention_score = body.mention_score
-                    user.tweets_per_hour = settings.tweets_per_hour
                     user.save()
                     job.delete()
                 except Exception as ex:
@@ -83,12 +82,14 @@ class UserCrawler():
         if user.followers_count>0 and user.friends_count>0:
             rels = self.res.get_relationships(user._id)
             rels.attempt_save()
+
         if user.statuses_count>0:
             tweets = self.res.user_timeline(user._id)
             for tweet in tweets:
                 tweet.attempt_save()
         if tweets:
             user.next_crawl_date = datetime.utcnow()
+            user.tweets_per_hour = settings.tweets_per_hour
         
         user.lookup_done = True
         if user.local_prob == 1.0:
@@ -119,16 +120,10 @@ class UserCrawler():
             j._id = k
             j.put(self.stalk)
 
-    #def fixup(self):
-        #view = Model.database.paged_view('user/screen_name',include_docs=True)
-        #for user in (User(d['doc']) for d in view):
-            #user.save()
-
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     crawler = UserCrawler()
-    crawler.fixup()
-    #crawler.crawl()
+    crawler.crawl()
 
 
