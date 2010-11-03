@@ -69,9 +69,10 @@ def make_jeff():
 
 def rm_local():
     for user in db.paged_view('user/screen_name',include_docs=True):
-        user['doc'].update(user['doc']['l'])
-        del user['doc']['l']
-        db.save_doc(user['doc'])
+        if 'l' in user['doc']:
+            user['doc'].update(user['doc']['l'])
+            del user['doc']['l']
+            db.save_doc(user['doc'])
     design_sync()
 
 
