@@ -44,9 +44,6 @@ def print_counts():
     res = db.view('user/all',include_docs=True)
     for d in res:
         for k,v in d['doc'].iteritems():
-            if k != 'l' and not isinstance(v,list):
-                counts[k][v]+=1
-        for k,v in d['doc']['l'].iteritems():
             if not isinstance(v,list):
                 counts[k][v]+=1
 
@@ -61,7 +58,7 @@ def rm_next_crawl():
     latest = set(l['key'] for l in latest)
     for user in db.paged_view('user/next_crawl',include_docs=True):
         if user['id'] not in latest:
-            del user['doc']['l']['ncd']
+            del user['doc']['ncd']
             db.save_doc(user['doc'])
 
 def make_jeff():
@@ -69,3 +66,12 @@ def make_jeff():
     for row in db.paged_view('user/and_tweets',include_docs=True):
         if row['key'][0][-2:] == '58':
             jeff.save_doc(row['doc'])
+
+def rm_local():
+    for user in db.paged_view('user/screen_name',include_docs=True):
+        user['doc'].update(user['doc']['l'])
+        del user['doc']['l']
+        db.save_doc(user['doc'])
+    design_sync()
+
+

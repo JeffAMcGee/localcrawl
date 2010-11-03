@@ -52,16 +52,6 @@ class GeonamesPlace(ModelPart):
     name = TextProperty('name')
     population = IntProperty('pop')
 
-class LocalUser(ModelPart):
-    tweets_per_hour = FloatProperty('tph')
-    lookup_done = BoolProperty('ld')
-    next_crawl_date = DateTimeProperty('ncd')
-    rfriends_score = IntProperty('rfs')
-    mention_score = IntProperty('ats')
-    local_prob = FloatProperty('prob')
-    geonames_place = ModelProperty('gnp',GeonamesPlace)
-
-
 class User(TwitterModel):
     #contributors_enabled, follow_request_sent, following,
     #profile_background_color, profile_background_image_url,
@@ -71,7 +61,16 @@ class User(TwitterModel):
     #show_all_inline_media, time_zone, status, notifications,
 
     _id = TwitterIdProperty('_id','U')
-    local = ModelProperty('l',LocalUser)
+    #local = ModelProperty('l',LocalUser)
+
+    #local properties
+    tweets_per_hour = FloatProperty('tph')
+    lookup_done = BoolProperty('ld')
+    next_crawl_date = DateTimeProperty('ncd')
+    rfriends_score = IntProperty('rfs')
+    mention_score = IntProperty('ats')
+    local_prob = FloatProperty('prob')
+    geonames_place = ModelProperty('gnp',GeonamesPlace)
     
     #properties from twitter
     verified = BoolProperty("ver")

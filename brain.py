@@ -117,15 +117,15 @@ class Brain():
 
         view = Model.database.paged_view('user/screen_name',include_docs=True)
         for user in (User(d['doc']) for d in view):
-            user.local.local_prob
+            user.local_prob
             state, rfs, ats = self.scores.split(as_int_id(user._id))
-            user.local.rfriends_score = rfs
-            user.local.mention_score = ats
+            user.rfriends_score = rfs
+            user.mention_score = ats
             user.save()
-            if user.local.local_prob in locs:
+            if user.local_prob in locs:
                 for weight in weights:
                     score = log_score(rfs,ats,weight)
-                    counts[score][user.local.local_prob][weight]+=1
+                    counts[score][user.local_prob][weight]+=1
 
         print "\tnon\t\t\tunk\t\t\tlocal"
         print "\trfs\tavg\tats\trfs\tavg\tats\trfs\tavg\tats\ttot"
@@ -144,18 +144,18 @@ class Brain():
         view = Model.database.paged_view('user/screen_name',include_docs=True)
         res = TwitterResource()
         for user in (User(d['doc']) for d in view):
-            if user.local.local_prob != 1:
+            if user.local_prob != 1:
                 score = log_score(user.rfriends_score, user.mention_score)
-                if( user.local.local_prob==.5
+                if( user.local_prob==.5
                     and score >= settings.force_cutoff
-                    and not user.local.lookup_done
+                    and not user.lookup_done
                 ):
-                    user.local.tweets_per_hour = settings.tweets_per_hour
-                    user.local.next_crawl_date = datetime.utcnow()
-                    user.local.lookup_done = True
+                    user.tweets_per_hour = settings.tweets_per_hour
+                    user.next_crawl_date = datetime.utcnow()
+                    user.lookup_done = True
                     for tweet in res.user_timeline(user._id):
                         tweet.attempt_save()
-                user.local.local_prob = probs[score]
+                user.local_prob = probs[score]
                 user.save()
 
     def crawl(self):
@@ -207,10 +207,10 @@ class Brain():
             now = datetime.utcnow()
             delta = now - waiting[user._id]
             seconds = delta.seconds + delta.days*24*3600
-            tph = (3600.0*count/seconds + user.local.tweets_per_hour)/2
-            user.local.tweets_per_hour = tph
+            tph = (3600.0*count/seconds + user.tweets_per_hour)/2
+            user.tweets_per_hour = tph
             hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
-            user.local.next_crawl_date = now+timedelta(hours=hours)
+            user.next_crawl_date = now+timedelta(hours=hours)
             del waiting[user._id]
             user.save()
             job.delete()

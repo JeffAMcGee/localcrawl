@@ -39,7 +39,7 @@ class UserCrawler():
         place = self.gisgraphy.twitter_loc(user.location)
         if not place:
             return .5
-        user.local.geonames_place = place
+        user.geonames_place = place
         return 1 if self.gisgraphy.in_local_box(place.to_d()) else 0
 
     def crawl(self):
@@ -63,9 +63,9 @@ class UserCrawler():
                         job.delete()
                         continue
                     self.crawl_user(user)
-                    user.local.rfriends_score = body.rfriends_score
-                    user.local.mention_score = body.mention_score
-                    user.local.tweets_per_hour = settings.tweets_per_hour
+                    user.rfriends_score = body.rfriends_score
+                    user.mention_score = body.mention_score
+                    user.tweets_per_hour = settings.tweets_per_hour
                     user.save()
                     job.delete()
                 except Exception as ex:
@@ -75,8 +75,8 @@ class UserCrawler():
             print "api calls remaining: %d"%self.res.remaining
 
     def crawl_user(self,user):
-        user.local.local_prob = self._guess_location(user)
-        if user.local.local_prob != 1.0 or user.protected:
+        user.local_prob = self._guess_location(user)
+        if user.local_prob != 1.0 or user.protected:
             return
         rels=None
         tweets=None
@@ -88,10 +88,10 @@ class UserCrawler():
             for tweet in tweets:
                 tweet.attempt_save()
         if tweets:
-            user.local.next_crawl_date = datetime.utcnow()
+            user.next_crawl_date = datetime.utcnow()
         
-        user.local.lookup_done = True
-        if user.local.local_prob == 1.0:
+        user.lookup_done = True
+        if user.local_prob == 1.0:
             self.score_new_users(user, rels, tweets)
 
     def score_new_users(self, user, rels, tweets):
