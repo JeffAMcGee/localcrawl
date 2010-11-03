@@ -1,3 +1,4 @@
+import pdb
 class SettingsBunch(dict):
     def __getattr__(self, name):
         return self[name]
@@ -20,6 +21,7 @@ settings = SettingsBunch(
     tweets_per_hour = .04, # 1 tweet/day is median
     tweets_per_crawl = 20,
     max_hours = 100,
+    pdb = pdb.set_trace
 )
 
 try:

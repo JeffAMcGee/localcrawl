@@ -55,3 +55,17 @@ def print_counts():
         for v in sorted(d.keys()):
             print "%d\t%r"%(d[v],v)
         print
+
+def rm_next_crawl():
+    latest = db.view('user/latest',group=True)
+    latest = set(l['key'] for l in latest)
+    for user in db.paged_view('user/next_crawl',include_docs=True):
+        if user['id'] not in latest:
+            del user['doc']['l']['ncd']
+            db.save_doc(user['doc'])
+
+def make_jeff():
+    jeff = CouchDB('http://127.0.0.1:5984/jeff',True)
+    for row in db.paged_view('user/and_tweets',include_docs=True):
+        if row['key'][0][-2:] == '58':
+            jeff.save_doc(row['doc'])

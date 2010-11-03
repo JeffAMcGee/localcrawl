@@ -3,6 +3,7 @@ import signal
 import time
 from math import log
 import sys
+import traceback
 from datetime import datetime, timedelta
 
 import beanstalkc
@@ -21,7 +22,7 @@ CRAWL_PROPORTION = .10
 
 
 HALT = False
-def set_halt(x,y):
+def set_halt(x=None,y=None):
     global HALT
     HALT=True
 signal.signal(signal.SIGINT, set_halt)
@@ -118,9 +119,9 @@ class Brain():
         for user in (User(d['doc']) for d in view):
             user.local.local_prob
             state, rfs, ats = self.scores.split(as_int_id(user._id))
-            #user.local.rfriends_score = rfs
-            #user.local.mention_score = ats
-            #user.save()
+            user.local.rfriends_score = rfs
+            user.local.mention_score = ats
+            user.save()
             if user.local.local_prob in locs:
                 for weight in weights:
                     score = log_score(rfs,ats,weight)
@@ -161,21 +162,27 @@ class Brain():
         self.stalk.use('crawl')
         self.stalk.watch('crawled')
         waiting = dict()
-        while not HALT:
-            print "queue_crawl"
-            self.queue_crawl(waiting)
-            print len(waiting)
-            while len(waiting)>100:
-                print "read_crawled %d"%len(waiting)
+        try:
+            while not HALT:
+                print "queue_crawl"
+                self.queue_crawl(waiting)
+                print "read_crawled, %d"%len(waiting)
                 self.read_crawled(waiting)
+        except:
+                traceback.print_exc()
         while waiting:
-            print "read_crawled after HALT %d"%len(waiting)
-            self.read_crawled(waiting)
+            print "read_crawled after HALT, %d"%len(waiting)
+            try:
+                self.read_crawled(waiting)
+            except:
+                traceback.print_exc()
 
     def queue_crawl(self, waiting):
         endkey = datetime.utcnow().timetuple()[0:6]
         view = Model.database.paged_view('user/next_crawl', endkey=endkey)
         for user in view:
+            if len(waiting)>100:
+                return
             uid = user['id']
             if uid in waiting:
                 continue
@@ -185,11 +192,8 @@ class Brain():
             value = latest.one()['value']
             waiting[uid] = datetime(*value[1])
             d = dict(uid=uid,since_id=value[0])
-            self.stalk.put(json.dumps(d),ttr=settings.beanstalk_ttr)
+            self.stalk.put(json.dumps(d))
 
-            #FIXME: Only for testing!
-            if len(waiting)>110:
-                return
 
     def read_crawled(self, waiting):
         while True:
@@ -197,9 +201,10 @@ class Brain():
             if job is None:
                 return
             d = json.loads(job.body)
+            print d
             user = User.get_id(d['uid'])
             count = d['count']
-            now = datetime.now()
+            now = datetime.utcnow()
             delta = now - waiting[user._id]
             seconds = delta.seconds + delta.days*24*3600
             tph = (3600.0*count/seconds + user.local.tweets_per_hour)/2
@@ -208,6 +213,7 @@ class Brain():
             user.local.next_crawl_date = now+timedelta(hours=hours)
             del waiting[user._id]
             user.save()
+            job.delete()
 
 
 if __name__ == '__main__':

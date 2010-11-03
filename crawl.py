@@ -34,7 +34,8 @@ class UserCrawler():
             try:
                 job = self.stalk.reserve(None)
                 d = self._crawl_job(json.loads(job.body))
-                self.stalk.put(json.dumps(d),ttr=settings.beanstalk_ttr)
+                print d
+                self.stalk.put(json.dumps(d))
                 job.delete()
 
                 if self.res.remaining < 10:
@@ -50,7 +51,6 @@ class UserCrawler():
     def _crawl_job(self, job):
         uid = job['uid']
         since_id = as_int_id(job['since_id'])-1
-        print "crawl %s"%uid
 
         count = 0
         max_id = None
@@ -64,15 +64,12 @@ class UserCrawler():
             max_id =as_int_id(tweets[-1]._id)-1
             for tweet in tweets:
                 if as_int_id(tweet._id)-1>since_id:
-                    tweet.save()
+                    #FIXME: replace with save
+                    tweet.attempt_save()
             if not len(tweets):
                 print "no tweets found!"
 
-        print "saved %d"%count
-        return dict(
-            _id = uid,
-            count = count,
-        )
+        return dict(uid=uid, count=count)
 
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)

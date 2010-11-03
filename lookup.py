@@ -66,7 +66,6 @@ class UserCrawler():
                     user.local.rfriends_score = body.rfriends_score
                     user.local.mention_score = body.mention_score
                     user.local.tweets_per_hour = settings.tweets_per_hour
-                    user.local.next_crawl_date = datetime.utcnow()
                     user.save()
                     job.delete()
                 except Exception as ex:
@@ -88,6 +87,8 @@ class UserCrawler():
             tweets = self.res.user_timeline(user._id)
             for tweet in tweets:
                 tweet.attempt_save()
+        if tweets:
+            user.local.next_crawl_date = datetime.utcnow()
         
         user.local.lookup_done = True
         if user.local.local_prob == 1.0:
