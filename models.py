@@ -135,7 +135,7 @@ class JobBody(ModelPart):
     force = BoolProperty('force')
 
     def put(self, stalk):
-        stalk.put(json.dumps(self.to_d()),ttr=settings.beanstalk_ttr)
+        stalk.put(json.dumps(self.to_d()),ttr=settings.lookup_ttr)
 
     @classmethod
     def from_job(cls, job):

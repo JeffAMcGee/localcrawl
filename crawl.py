@@ -7,6 +7,7 @@ from couchdbkit import ResourceConflict
 from datetime import datetime
 import time
 from itertools import groupby
+from restkit import Unauthorized
 
 import maroon
 from maroon import *
@@ -35,7 +36,7 @@ class UserCrawler():
                 job = self.stalk.reserve(None)
                 d = self._crawl_job(json.loads(job.body))
                 print d
-                self.stalk.put(json.dumps(d))
+                self.stalk.put(json.dumps(d),ttr=settings.crawl_ttr)
                 job.delete()
 
                 if self.res.remaining < 10:
@@ -55,19 +56,27 @@ class UserCrawler():
         count = 0
         max_id = None
         while count<=3000 and since_id != max_id:
-            tweets = self.res.user_timeline(
-                uid,
-                max_id = max_id,
-                since_id = since_id,
-            )
+            try:
+                tweets = self.res.user_timeline(
+                    uid,
+                    max_id = max_id,
+                    since_id = since_id,
+                )
+            except Unauthorized:
+                print "unauthorized!"
+                break
+            if not tweets:
+                print "no tweets found after %d"%count
+                break
             count+=len(tweets)
             max_id =as_int_id(tweets[-1]._id)-1
             for tweet in tweets:
                 if as_int_id(tweet._id)-1>since_id:
-                    #FIXME: replace with save
+                    #FIXME: replace with save??
                     tweet.attempt_save()
-            if not len(tweets):
-                print "no tweets found!"
+            if len(tweets)<175:
+                #there are no more tweets, and since_id+1 for was deleted
+                break
 
         return dict(uid=uid, count=count)
 

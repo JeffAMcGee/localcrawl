@@ -217,12 +217,12 @@ class Brain():
 if __name__ == '__main__':
     Model.database = CouchDB(settings.couchdb,True)
     brain = Brain()
-    brain.scores.read(settings.brain_in)
-    brain.lookups = brain.scores.count_lookups()
     if sys.argv[1] == 'lookup':
+        brain.scores.read(settings.brain_in)
+        brain.lookups = brain.scores.count_lookups()
         brain.lookup()
     elif sys.argv[1] == 'crawl':
         brain.crawl()
     else:
-        print "brain.py [lookup|prep|crawl]"
+        print "brain.py [lookup|crawl]"
 
