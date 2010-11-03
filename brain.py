@@ -105,62 +105,6 @@ class Brain():
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
-    #FIXME: move to admin
-    def analyze(self):
-        locs = (0,.5,1)
-        weights =(0,settings.mention_weight,1) 
-        counts = dict(
-            (score, dict(
-                (loc, dict(
-                    (weight,0) 
-                    for weight in weights))
-                for loc in locs))
-            for score in xrange(BUCKETS))
-
-        view = Model.database.paged_view('user/screen_name',include_docs=True)
-        for user in (User(d['doc']) for d in view):
-            user.local_prob
-            state, rfs, ats = self.scores.split(as_int_id(user._id))
-            user.rfriends_score = rfs
-            user.mention_score = ats
-            user.save()
-            if user.local_prob in locs:
-                for weight in weights:
-                    score = log_score(rfs,ats,weight)
-                    counts[score][user.local_prob][weight]+=1
-
-        print "\tnon\t\t\tunk\t\t\tlocal"
-        print "\trfs\tavg\tats\trfs\tavg\tats\trfs\tavg\tats\ttot"
-        for score in xrange(BUCKETS):
-            print score,
-            for loc in locs:
-                for weight in weights:
-                    print "\t%d"%counts[score][loc][weight],
-            print "\t%d"%sum(
-                counts[score][loc][settings.mention_weight]
-                for loc in locs)
-
-    #FIXME: move to admin
-    def force_lookup(self):
-        #ratio of locals to non-locals taken from a spreadsheet
-        probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
-        view = Model.database.paged_view('user/screen_name',include_docs=True)
-        res = TwitterResource()
-        for user in (User(d['doc']) for d in view):
-            if user.local_prob != 1:
-                score = log_score(user.rfriends_score, user.mention_score)
-                if( user.local_prob==.5
-                    and score >= settings.force_cutoff
-                    and not user.lookup_done
-                ):
-                    user.tweets_per_hour = settings.tweets_per_hour
-                    user.next_crawl_date = datetime.utcnow()
-                    user.lookup_done = True
-                    for tweet in res.user_timeline(user._id):
-                        tweet.attempt_save()
-                user.local_prob = probs[score]
-                user.save()
-
     def crawl(self):
         self.stalk.use('crawl')
         self.stalk.watch('crawled')
