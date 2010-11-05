@@ -8,11 +8,19 @@ import beanstalkc
 from settings import settings
 from collections import defaultdict
 import twitter
+import itertools
+from operator import itemgetter
+import time
+import os,errno
+from datetime import datetime
 
 db = CouchDB(settings.couchdb,True)
 res = twitter.TwitterResource()
 Model.database = db
-c = beanstalkc.Connection()
+try:
+    c = beanstalkc.Connection()
+except:
+    pass
 
 def connect(name):
     "connect to the couchdb database on localhost named name"
@@ -62,8 +70,8 @@ def make_jeff_db():
 
 
 def rm_local():
-    "Move everything in the local property into the user.  This code is no
-    longer needed."
+    """Move everything in the local property into the user.  This code is no
+    longer needed."""
     for user in db.paged_view('user/screen_name',include_docs=True):
         if 'l' in user['doc']:
             user['doc'].update(user['doc']['l'])
@@ -93,7 +101,7 @@ def analyze():
         user.mention_score = ats
         user.save()
         if user.local_prob in locs:
-            for weight in weights:e
+            for weight in weights:
                 score = log_score(rfs,ats,weight)
                 counts[score][user.local_prob][weight]+=1
 
@@ -132,3 +140,32 @@ def force_lookup():
             user.save()
 
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as ex:
+        if ex.errno!=errno.EEXIST:
+            raise
+
+
+def krishna_export(start=[2010],end=None):
+    "export the tweets for Krishna's crawler"
+    view = Model.database.paged_view(
+            'tweet/date',
+            include_docs=True,
+            startkey=start,
+            endkey=end
+        )
+    for k,g in itertools.groupby(view,itemgetter('key')):
+        path = os.path.join(*(str(x) for x in k))
+        mkdir_p(os.path.dirname(path))
+        with open(path,'w') as f:
+            for t in (row['doc'] for row in g):
+                ts = int(time.mktime(datetime(*t['ca']).timetuple()))
+                if t['ats']:
+                    for at in t['ats']:
+                        print>>f,"%d %s %s %s"%(ts,t['_id'],t['uid'],at)
+                else:
+                    print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
+
+krishna_export()
