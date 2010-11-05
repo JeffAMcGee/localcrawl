@@ -5,6 +5,7 @@ from math import log
 import sys
 import traceback
 from datetime import datetime, timedelta
+import logging
 
 import beanstalkc
 from couchdbkit import ResourceConflict 
@@ -17,6 +18,7 @@ from twitter import TwitterResource
 from settings import settings
 from scoredict import Scores, log_score, BUCKETS
 import scoredict
+from utils import LocalApp
 
 CRAWL_PROPORTION = .10
 
@@ -29,18 +31,16 @@ signal.signal(signal.SIGINT, set_halt)
 signal.signal(signal.SIGUSR1, set_halt)
 
 
-class Brain():
-    def __init__(self):
-        self.stalk = beanstalkc.Connection(
-                settings.beanstalk_host,
-                settings.beanstalk_port,
-                )
+class Brain(LocalApp):
+    def __init__(self, task):
+        LocalApp.__init__(self,task)
         self.scores = Scores()
         self.lookups = 0
 
     def lookup(self):
-        self.stalk.use('lookup')
-        self.stalk.watch('score')
+        logging.info("getting started")
+        brain.scores.read(settings.brain_in)
+        brain.lookups = brain.scores.count_lookups()
         while True:
             print "read_scores"
             self.read_scores()
@@ -101,7 +101,7 @@ class Brain():
                 self.lookups+=1
 
     def should_wait(self):
-        ready = self.stalk.stats_tube('lookup')['current-jobs-ready']
+        ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
         print "ready is %d"%ready
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
@@ -159,13 +159,11 @@ class Brain():
 
 
 if __name__ == '__main__':
-    Model.database = CouchDB(settings.couchdb,True)
-    brain = Brain()
-    if sys.argv[1] == 'lookup':
-        brain.scores.read(settings.brain_in)
-        brain.lookups = brain.scores.count_lookups()
+    task = sys.argv[1]
+    brain = Brain(task)
+    if task == 'lookup':
         brain.lookup()
-    elif sys.argv[1] == 'crawl':
+    elif task == 'crawl':
         brain.crawl()
     else:
         print "brain.py [lookup|crawl]"

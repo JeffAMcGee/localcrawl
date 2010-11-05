@@ -9,16 +9,17 @@ class SettingsBunch(dict):
 settings = SettingsBunch(
     #FIXME: set local_box and couchdb for hou
     local_box = dict(lat=(30.5,31),lng=(-96.5,-96)),
-    couchdb = 'http://127.0.0.1:5984/bcstx',
+    region = "fiddle",
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
-    #FIXME: should we change mention_weight?
+    couchdb_root = 'http://localhost:5984/',
     mention_weight = .5,
     crawl_ratio = .1,
     force_cutoff = 8,
     brain_in = 'brain.in',
     brain_out = 'brain.out',
+    log_dir = 'logs',
     lookup_ttr = 3600,
     crawl_ttr = 480,
     tweets_per_hour = .04, # 1 tweet/day is median

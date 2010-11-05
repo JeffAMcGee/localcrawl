@@ -16,19 +16,15 @@ from models import Relationships, User, Tweet, JobBody, as_local_id, as_int_id
 from twitter import TwitterResource
 from settings import settings
 from gisgraphy import GisgraphyResource
+from utils import LocalApp
 
 
 #signal.signal(signal.SIGINT, lambda x, y: pdb.set_trace())
 
-class UserCrawler():
-    def __init__(self):
+class UserCrawler(LocalApp):
+    def __init__(self,slave_id):
+        LocalApp.__init__(self,'crawl',slave_id)
         self.res = TwitterResource()
-        self.stalk = beanstalkc.Connection(
-                settings.beanstalk_host,
-                settings.beanstalk_port,
-                )
-        self.stalk.use('crawled')
-        self.stalk.watch('crawl')
 
     def crawl(self):
         while True:
@@ -83,8 +79,5 @@ class UserCrawler():
         return dict(uid=uid, count=count)
 
 if __name__ == '__main__':
-    Model.database = CouchDB(settings.couchdb,True)
-    crawler = UserCrawler()
+    crawler = UserCrawler('a')
     crawler.crawl()
-
-

@@ -14,11 +14,11 @@ import time
 import os,errno
 from datetime import datetime
 
-db = CouchDB(settings.couchdb,True)
+db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()
 Model.database = db
 try:
-    c = beanstalkc.Connection()
+    stalk = beanstalkc.Connection()
 except:
     pass
 
@@ -167,5 +167,3 @@ def krishna_export(start=[2010],end=None):
                         print>>f,"%d %s %s %s"%(ts,t['_id'],t['uid'],at)
                 else:
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
-
-krishna_export()

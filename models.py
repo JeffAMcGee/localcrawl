@@ -140,8 +140,3 @@ class JobBody(ModelPart):
     @classmethod
     def from_job(cls, job):
         return JobBody(json.loads(job.body))
-
-if __name__ == '__main__':
-    global db
-    db = CouchDB(settings.couchdb,True)
-    Model.database = db
