@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 from itertools import groupby
 from restkit import Unauthorized
+import logging
 
 import maroon
 from maroon import *
@@ -28,6 +29,7 @@ class UserCrawler(LocalApp):
 
     def crawl(self):
         while True:
+            job=None
             try:
                 job = self.stalk.reserve(None)
                 d = self._crawl_job(job)
@@ -36,19 +38,21 @@ class UserCrawler(LocalApp):
 
                 if self.res.remaining < 10:
                     dt = (self.res.reset_time-datetime.utcnow())
-                    print "goodnight for %r"%dt
+                    logging.info("goodnight for %r",dt)
                     time.sleep(dt.seconds)
             except Exception as ex:
-                print ex
-                job.bury()
-                pdb.post_mortem()
-            print "api calls remaining: %d"%self.res.remaining
+                if job:
+                    logging.exception("exception for job %s"%job.body)
+                    job.bury()
+                else:
+                    logging.exception("exception and job is None")
+            logging.info("api calls remaining: %d",self.res.remaining)
 
     def _crawl_job(self, job):
         d = json.loads(job.body)
         uid = d['uid']
         since_id = as_int_id(d['since_id'])-1
-        print d
+        logging.debug("%r",d)
 
         count = 0
         max_id = None
@@ -60,10 +64,10 @@ class UserCrawler(LocalApp):
                     since_id = since_id,
                 )
             except Unauthorized:
-                print "unauthorized!"
+                logging.warn("unauthorized!")
                 break
             if not tweets:
-                print "no tweets found after %d"%count
+                logging.warn("no tweets found after %d for %s",count,uid)
                 break
             job.touch()
             count+=len(tweets)

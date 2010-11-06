@@ -7,6 +7,7 @@ from couchdbkit import ResourceConflict
 from datetime import datetime
 import time
 from itertools import groupby
+import logging
 
 import maroon
 from maroon import *
@@ -46,15 +47,15 @@ class UserCrawler(LocalApp):
             bodies = [JobBody.from_job(j) for j in jobs]
             users =self.res.user_lookup([b._id for b in bodies])
 
-            print "looking at %r"%[u.screen_name for u in users]
+            logging.info("looking at %r"%[u.screen_name for u in users])
             #get user_ids from beanstalk
             for job,body,user in zip(jobs,bodies,users):
                 try:
                     if self.res.remaining < 30:
                         dt = (self.res.reset_time-datetime.utcnow())
-                        print "goodnight for %r"%dt
+                        logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
-                    print "look at %s"%user.screen_name
+                    logging.info("look at %s",user.screen_name)
                     if user._id in User.database:
                         job.delete()
                         continue
@@ -63,11 +64,10 @@ class UserCrawler(LocalApp):
                     user.mention_score = body.mention_score
                     user.save()
                     job.delete()
-                except Exception as ex:
-                    print ex
-                    pdb.post_mortem()
+                except:
+                    logging.exception("exception for job %s"%job.body)
                     job.bury()
-            print "api calls remaining: %d"%self.res.remaining
+            logging.info("api calls remaining: %d",self.res.remaining)
 
     def crawl_user(self,user):
         user.local_prob = self._guess_location(user)

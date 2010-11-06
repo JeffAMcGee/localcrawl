@@ -1,6 +1,7 @@
 import datetime
 import json
 from couchdbkit import ResourceConflict
+import logging
 
 import maroon
 from maroon import *
@@ -26,7 +27,7 @@ class TwitterModel(Model):
         try:
             self.save()
         except ResourceConflict:
-            print "conflict on %s %s"%(self.__class__.__name__,self._id)
+            logging.warn("conflict on %s %s",self.__class__.__name__,self._id)
 
 class TwitterIdProperty(TextProperty):
     def __init__(self, name, prefix, **kwargs):

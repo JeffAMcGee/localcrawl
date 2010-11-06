@@ -38,21 +38,28 @@ class Brain(LocalApp):
         self.lookups = 0
 
     def lookup(self):
-        logging.info("getting started")
         brain.scores.read(settings.brain_in)
         brain.lookups = brain.scores.count_lookups()
+        print "starting lookup"
+        logging.info("started lookup")
         while True:
-            print "read_scores"
+            logging.info("read_scores")
             self.read_scores()
+
             #FIXME: it stops at 10000 scores for debuging
             if HALT or len(self.scores)>10000:
                 self.scores.dump(settings.brain_out)
                 return
-            print "calc_cutoff"
+
+            logging.info("calc_cutoff")
             cutoff = self.calc_cutoff()
-            print "pick_users with score %d"%cutoff
+
+            logging.info("pick_users with score %d", cutoff)
+            logging.info("scores: %d lookups %d"%len(self.scores),self.lookups)
+            print("scores: %d lookups %d"%len(self.scores),self.lookups)
             self.pick_users(cutoff)
-            print "wait"
+
+            logging.info("waiting")
             while self.should_wait() and not HALT:
                 time.sleep(60)
 
@@ -60,7 +67,7 @@ class Brain(LocalApp):
         for x in xrange(1000000):
             job = self.stalk.reserve(0)
             if job is None:
-                print "loaded %d"%x
+                logging.info("loaded %d scores",x)
                 return
             body = JobBody.from_job(job)
             if body.done:
@@ -80,7 +87,7 @@ class Brain(LocalApp):
             if state==scoredict.NEW:
                 self.stats[log_score(rfs,ats)]+=1
         for count,score in zip(self.stats,xrange(BUCKETS)):
-            print "%d %d"%(score,count)
+            logging.info("%d %d",score,count)
         total = 0
         for i in xrange(BUCKETS-1,-1,-1):
             total+=self.stats[i]
@@ -102,27 +109,26 @@ class Brain(LocalApp):
 
     def should_wait(self):
         ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
-        print "ready is %d"%ready
+        logging.info("ready is %d",ready)
         return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
 
     def crawl(self):
-        self.stalk.use('crawl')
-        self.stalk.watch('crawled')
         waiting = dict()
         try:
             while not HALT:
-                print "queue_crawl"
+                logging.info("queue_crawl")
                 self.queue_crawl(waiting)
-                print "read_crawled, %d"%len(waiting)
+                logging.info("read_crawled, %d",len(waiting))
                 self.read_crawled(waiting)
         except:
-                traceback.print_exc()
+            logging.exception("exception caused HALT")
+            set_halt()
         while waiting:
-            print "read_crawled after HALT, %d"%len(waiting)
+            logging.info("read_crawled after HALT, %d",len(waiting))
             try:
                 self.read_crawled(waiting)
             except:
-                traceback.print_exc()
+                logging.exception("exception after HALT")
 
     def queue_crawl(self, waiting):
         now = datetime.utcnow().timetuple()[0:6]
@@ -143,7 +149,7 @@ class Brain(LocalApp):
         job = self.stalk.reserve(60)
         while job is not None:
             d = json.loads(job.body)
-            print d
+            logging.debug(d)
             user = User.get_id(d['uid'])
             now = datetime.utcnow()
             delta = now - waiting[user._id]

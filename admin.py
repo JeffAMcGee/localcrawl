@@ -1,18 +1,21 @@
 # This is a tool for testing and administrative tasks.  It is designed to
 # be %run in ipython.
 
-from couchdbkit.loaders import FileSystemDocsLoader
-from models import *
 import json
-import beanstalkc
-from settings import settings
-from collections import defaultdict
-import twitter
 import itertools
-from operator import itemgetter
 import time
 import os,errno
+import logging
+from collections import defaultdict
 from datetime import datetime
+from operator import itemgetter
+
+from couchdbkit.loaders import FileSystemDocsLoader
+import beanstalkc
+
+from settings import settings
+import twitter
+from models import *
 
 db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()

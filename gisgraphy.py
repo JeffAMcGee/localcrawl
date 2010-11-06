@@ -56,7 +56,7 @@ class GisgraphyResource(Resource):
             if len(parts)==2:
                 for part in parts:
                     res = self.twitter_loc(part)
-                    if self.in_local_box(res.to_d()):
+                    if res and self.in_local_box(res.to_d()):
                         return res
                     if res:
                         found = res

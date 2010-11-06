@@ -25,5 +25,5 @@ class LocalApp(object):
 
         log = label+"_"+slave_id if slave_id else label
         filepath = os.path.join(settings.log_dir, log)
-        logging.basicConfig(filename=filepath)
+        logging.basicConfig(filename=filepath,level=logging.INFO)
         

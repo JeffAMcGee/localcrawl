@@ -46,8 +46,6 @@ class TwitterResource(Resource):
                     raise Exception("Error 304 - %s, "%r.final_url)
                 return json.loads(r.body_string())
             except RequestFailed as failure:
-                print failure.response.status_int
-                print failure.response.final_url
                 logging.error("%s while retrieving %s",
                         failure.response.status,
                         failure.response.final_url
