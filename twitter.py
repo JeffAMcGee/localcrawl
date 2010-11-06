@@ -4,6 +4,7 @@ import restkit.util.oauth2 as oauth
 import json
 import time
 import logging
+import pdb
 from datetime import datetime
 from restkit.errors import RequestFailed
 from settings import settings
@@ -46,14 +47,20 @@ class TwitterResource(Resource):
                     raise Exception("Error 304 - %s, "%r.final_url)
                 return json.loads(r.body_string())
             except RequestFailed as failure:
-                logging.error("%s while retrieving %s",
+                if failure.response.status_int == 502:
+                    logging.error("Fail whale says slow down!")
+                else:
+                    logging.error("%s while retrieving %s",
                         failure.response.status,
                         failure.response.final_url
-                )
+                    )
                 if failure.response.status_int in (400,420,503):
-                    # The whale says slow down!
+                    # The whale says slow WAY down!
                     delay = 240
                 time.sleep(delay)
+            except:
+                pdb.post_mortem()
+                pdb.set_trace()
         raise Exception("Epic Fail Whale! - %s"%r.final_url)
 
     def get_ids(self, path, user_id, **kwargs):
