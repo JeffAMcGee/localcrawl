@@ -4,7 +4,6 @@ import restkit.util.oauth2 as oauth
 import json
 import time
 import logging
-import pdb
 from datetime import datetime
 from restkit.errors import RequestFailed
 from settings import settings
@@ -58,9 +57,6 @@ class TwitterResource(Resource):
                     # The whale says slow WAY down!
                     delay = 240
                 time.sleep(delay)
-            except:
-                pdb.post_mortem()
-                pdb.set_trace()
         raise Exception("Epic Fail Whale! - %s"%r.final_url)
 
     def get_ids(self, path, user_id, **kwargs):

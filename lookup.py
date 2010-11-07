@@ -58,7 +58,7 @@ class LookupMaster(LocalProc):
 
             logging.info("pick_users with score %d", cutoff)
             logging.info("scores: %d lookups %d",len(self.scores),self.lookups)
-            print "scores: %d lookups %d"%(len(self.scores),self.lookups)
+            #print "scores: %d lookups %d"%(len(self.scores),self.lookups)
             self.pick_users(cutoff)
 
             logging.info("waiting")
@@ -95,6 +95,7 @@ class LookupMaster(LocalProc):
             total+=self.stats[i]
             if total > settings.crawl_ratio*(len(self.scores)-self.lookups):
                 return i
+        return 0
 
     def pick_users(self, cutoff):
         for uid in self.scores:
@@ -211,4 +212,5 @@ class LookupSlave(LocalProc):
 if __name__ == '__main__':
     create_slaves(LookupSlave)
     proc = LookupMaster()
+    #proc = LookupSlave('x')
     proc.run()
