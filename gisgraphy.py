@@ -29,8 +29,6 @@ class GisgraphyResource(Resource):
         return json.loads(r.body_string())["response"]["docs"]
 
     def twitter_loc(self, q):
-        q = q.lower().strip().replace('-','/').replace(',',', ')
-        q = ''.join(re.split('[|&!]',q))
         if not q:
             return None
         # check for "30.639, -96.347" style coordinates
@@ -41,6 +39,9 @@ class GisgraphyResource(Resource):
                 lng=float(match.group(2)),
                 feature_code='COORD',
             )
+        #try gisgraphy
+        q = q.lower().strip().replace('-','/').replace(',',', ')
+        q = ''.join(re.split('[|&!]',q))
         results = self.fulltextsearch(q)
         # Is there a local place in the first 10 results?
         for place in results:

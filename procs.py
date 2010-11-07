@@ -1,17 +1,15 @@
-# This is a tool for testing and administrative tasks.  It is designed to
-# be %run in ipython.
 
-from models import *
-import json
 import beanstalkc
-from settings import settings
-import time
-import os,errno
+import os
+import string
 import logging
-from datetime import datetime as dt
+from multiprocessing import Process
+
+from settings import settings
+from models import *
 
 
-class LocalApp(object):
+class LocalProc(object):
     def __init__(self, task, slave_id=""):
         self.stalk = beanstalkc.Connection(
                 settings.beanstalk_host,
@@ -26,4 +24,16 @@ class LocalApp(object):
         log = label+"_"+slave_id if slave_id else label
         filepath = os.path.join(settings.log_dir, log)
         logging.basicConfig(filename=filepath,level=logging.INFO)
-        
+
+
+def _run_slave(Proc,slave_id):
+    p = Proc(slave_id)
+    p.run()
+
+
+def create_slaves(Proc):
+    for x in xrange(settings.slaves):
+        slave_id = string.letters[x]
+        p = Process(target=_run_slave, args=(Proc,slave_id,))
+        p.daemon = True
+        p.start()

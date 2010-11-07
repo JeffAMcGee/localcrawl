@@ -10,6 +10,7 @@ settings = SettingsBunch(
     #FIXME: set local_box and couchdb for hou
     local_box = dict(lat=(30.5,31),lng=(-96.5,-96)),
     region = "fiddle",
+    slaves = 2,
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
