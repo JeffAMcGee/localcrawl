@@ -9,6 +9,7 @@ from restkit.errors import RequestFailed
 from settings import settings
 from models import Relationships, User, Tweet, as_local_id, as_int_id
 
+
 class TwitterResource(Resource):
     # When a request fails, we retry with an exponential backoff from
     # 15 to 240 seconds.

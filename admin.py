@@ -85,7 +85,7 @@ def rm_local():
 def analyze():
     "Find out how the scoring algorithm did."
     scores = Scores()
-    scores.read(settings.brain_in)
+    scores.read(settings.lookup_in)
     locs = (0,.5,1)
     weights =(0,settings.mention_weight,1)
     counts = dict(

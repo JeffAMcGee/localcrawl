@@ -7,6 +7,7 @@ from datetime import datetime
 import time
 from itertools import groupby
 import logging
+import sys
 
 import maroon
 from maroon import *
@@ -38,19 +39,20 @@ class LookupMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"lookup")
         self.scores = Scores()
-        self.scores.read(settings.brain_in)
+        self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
 
     def run(self):
         print "starting lookup"
         logging.info("started lookup")
         while True:
+        #for x in xrange(1):
             logging.info("read_scores")
             self.read_scores()
 
             #FIXME: it stops at 10000 scores for debuging
             if HALT or len(self.scores)>10000:
-                self.scores.dump(settings.brain_out)
+                self.scores.dump(settings.lookup_out)
                 return
 
             logging.info("calc_cutoff")
@@ -64,6 +66,7 @@ class LookupMaster(LocalProc):
             logging.info("waiting")
             while self.should_wait() and not HALT:
                 time.sleep(60)
+        time.sleep(3600)
 
     def read_scores(self):
         for x in xrange(1000000):
@@ -210,7 +213,13 @@ class LookupSlave(LocalProc):
 
 
 if __name__ == '__main__':
-    create_slaves(LookupSlave)
-    proc = LookupMaster()
-    #proc = LookupSlave('x')
+    if len(sys.argv) >1:
+        if sys.argv[1]=='m':
+            proc = LookupMaster()
+        elif sys.argv[1]=='s':
+            proc = LookupSlave('x')
+    else:
+        print "spawning minions!"
+        create_slaves(LookupSlave)
+        proc = LookupMaster()
     proc.run()

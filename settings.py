@@ -8,9 +8,9 @@ class SettingsBunch(dict):
 
 settings = SettingsBunch(
     #FIXME: set local_box and couchdb for hou
-    local_box = dict(lat=(30.5,31),lng=(-96.5,-96)),
-    region = "fiddle",
-    slaves = 2,
+    local_box = dict(lat=(29,30.5),lng=(-96,-94.5)),
+    region = "houtx",
+    slaves = 1,
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
@@ -18,8 +18,8 @@ settings = SettingsBunch(
     mention_weight = .5,
     crawl_ratio = .1,
     force_cutoff = 8,
-    brain_in = 'brain.in',
-    brain_out = 'brain.out',
+    lookup_in = 'lookup.in',
+    lookup_out = 'lookup.out',
     log_dir = 'logs',
     lookup_ttr = 3600,
     crawl_ttr = 480,
