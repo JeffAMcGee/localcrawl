@@ -42,6 +42,10 @@ class LookupMaster(LocalProc):
                     logging.info("calc_cutoff")
                     cutoff = self.calc_cutoff()
 
+                    if cutoff==0:
+                        self.halt=True
+                        print "halt because cutoff is 0"
+                        break
                     logging.info("pick_users with score %d", cutoff)
                     self.pick_users(cutoff)
                     print "scores:%d lookups:%d"%(len(self.scores),self.lookups)
@@ -50,17 +54,15 @@ class LookupMaster(LocalProc):
                 self.read_scores()
         except:
             logging.exception("exception caused HALT")
-            import pdb
-            pdb.post_mortem()
         self.read_scores()
         self.scores.dump(settings.lookup_out)
         print "Lookup is done!"
 
     def read_scores(self):
         job = None
-        for x in xrange(1000000):
+        for x in xrange(100000):
             try:
-                job = self.stalk.reserve(60)
+                job = self.stalk.reserve(600)
                 if job is None:
                     logging.info("loaded %d scores",x)
                     return

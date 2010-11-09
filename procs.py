@@ -28,7 +28,11 @@ class LocalProc(object):
 
 def _run_slave(Proc,slave_id):
     p = Proc(slave_id)
-    p.run()
+    try:
+        p.run()
+    except:
+        logging.exception("exception killed proc")
+        print "exception killed proc"
 
 
 def create_slaves(Proc):
