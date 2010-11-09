@@ -38,7 +38,7 @@ def design_sync():
 
 
 def stop_lookup():
-    stalk.watch(settings.region+"_done")
+    stalk.use(settings.region+"_lookup_done")
     stalk.put('halt',0)
 
 
