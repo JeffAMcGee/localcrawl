@@ -3,7 +3,7 @@ import beanstalkc
 import json
 import pdb
 import signal
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 from itertools import groupby
 from restkit import Unauthorized
