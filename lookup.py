@@ -68,6 +68,7 @@ class LookupMaster(LocalProc):
                     return
                 if job.body=="halt":
                     self.halt=True
+                    print "starting to halt..."
                     logging.info("starting to halt...")
                     job.delete()
                     return
