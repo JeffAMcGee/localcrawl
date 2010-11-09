@@ -47,7 +47,7 @@ class TwitterResource(Resource):
                     raise Exception("Error 304 - %s, "%r.final_url)
                 return json.loads(r.body_string())
             except ValueError:
-                logging.info("incomplete json for %s"%r.final_url)
+                logging.exception("incomplete json")
             except RequestFailed as failure:
                 if failure.response.status_int == 502:
                     logging.info("Fail whale says slow down!")
@@ -59,7 +59,7 @@ class TwitterResource(Resource):
                 if failure.response.status_int in (400,420,503):
                     # The whale says slow WAY down!
                     delay = 240
-                time.sleep(delay)
+            time.sleep(delay)
         raise Exception("Epic Fail Whale! - %s"%path)
 
     def get_ids(self, path, user_id, **kwargs):

@@ -149,6 +149,6 @@ class CrawlSlave(LocalProc):
         return dict(uid=uid, count=count)
 
 if __name__ == '__main__':
-    create_slaves(LookupSlave)
-    proc = LookupMaster()
+    create_slaves(CrawlSlave)
+    proc = CrawlMaster()
     proc.run()
