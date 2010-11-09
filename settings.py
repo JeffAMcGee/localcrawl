@@ -7,10 +7,9 @@ class SettingsBunch(dict):
         self[name] = value
 
 settings = SettingsBunch(
-    #FIXME: set local_box and couchdb for hou
     local_box = dict(lat=(29,30.5),lng=(-96,-94.5)),
     region = "houtx",
-    slaves = 1,
+    slaves = 12,
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
