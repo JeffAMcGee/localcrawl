@@ -24,16 +24,6 @@ import scoredict
 RFRIEND_POINTS = 1000
 MENTION_POINTS = 1000
 
-#signal.signal(signal.SIGINT, lambda x, y: pdb.set_trace())
-
-
-HALT = False
-def set_halt(x=None,y=None):
-    global HALT
-    HALT=True
-signal.signal(signal.SIGINT, set_halt)
-signal.signal(signal.SIGUSR1, set_halt)
-
 
 class LookupMaster(LocalProc):
     def __init__(self):
@@ -41,49 +31,62 @@ class LookupMaster(LocalProc):
         self.scores = Scores()
         self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
+        self.halt = False
 
     def run(self):
         print "starting lookup"
         logging.info("started lookup")
-        while True:
-        #for x in xrange(1):
-            logging.info("read_scores")
-            self.read_scores()
+        try:
+            while not self.halt and len(self.scores)<5000:
+                logging.info("calc_cutoff")
+                cutoff = self.calc_cutoff()
 
-            #FIXME: it stops at 10000 scores for debuging
-            if HALT or len(self.scores)>10000:
-                self.scores.dump(settings.lookup_out)
-                return
+                logging.info("pick_users with score %d", cutoff)
+                logging.info("scores: %d lookups %d",len(self.scores),self.lookups)
+                print "scores: %d lookups %d"%(len(self.scores),self.lookups)
+                self.pick_users(cutoff)
 
-            logging.info("calc_cutoff")
-            cutoff = self.calc_cutoff()
-
-            logging.info("pick_users with score %d", cutoff)
-            logging.info("scores: %d lookups %d",len(self.scores),self.lookups)
-            #print "scores: %d lookups %d"%(len(self.scores),self.lookups)
-            self.pick_users(cutoff)
-
-            logging.info("waiting")
-            while self.should_wait() and not HALT:
-                time.sleep(60)
-        time.sleep(3600)
+                logging.info("waiting")
+                while self.should_wait() and not self.halt:
+                    logging.info("read_scores")
+                    self.read_scores()
+        except:
+            logging.exception("exception caused HALT")
+            import pdb
+            pdb.post_mortem()
+        self.read_scores()
+        self.scores.dump(settings.lookup_out)
+        print "Lookup is done!"
 
     def read_scores(self):
+        job = None
         for x in xrange(1000000):
-            job = self.stalk.reserve(0)
-            if job is None:
-                logging.info("loaded %d scores",x)
+            try:
+                job = self.stalk.reserve(60)
+                if job is None:
+                    logging.info("loaded %d scores",x)
+                    return
+                if job.body=="halt":
+                    self.halt=True
+                    logging.info("starting to halt...")
+                    job.delete()
+                    return
+                body = JobBody.from_job(job)
+                if body.done:
+                    self.scores.set_state(as_int_id(body._id), scoredict.DONE)
+                else:
+                    self.scores.increment(
+                        as_int_id(body._id),
+                        body.rfriends_score,
+                        body.mention_score
+                    )
+                job.delete()
+            except:
+                logging.exception("exception in read_scores caused HALT")
+                self.halt = True
+                if job:
+                    job.bury()
                 return
-            body = JobBody.from_job(job)
-            if body.done:
-                self.scores.set_state(as_int_id(body._id), scoredict.DONE)
-            else:
-                self.scores.increment(
-                    as_int_id(body._id),
-                    body.rfriends_score,
-                    body.mention_score
-                )
-            job.delete()
 
     def calc_cutoff(self):
         self.stats = [0 for x in xrange(BUCKETS)]

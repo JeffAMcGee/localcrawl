@@ -37,6 +37,11 @@ def design_sync():
     loader.sync(db, verbose=True)
 
 
+def stop_lookup():
+    stalk.watch(settings.region+"_done")
+    stalk.put('halt',0)
+
+
 def print_counts():
     "determine how unique a key is - don't try to use this on a big dataset!"
     counts = defaultdict(lambda: defaultdict(int))

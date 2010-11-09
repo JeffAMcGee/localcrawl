@@ -46,9 +46,11 @@ class TwitterResource(Resource):
                     # why I raise the exception.
                     raise Exception("Error 304 - %s, "%r.final_url)
                 return json.loads(r.body_string())
+            except ValueError:
+                logging.info("incomplete json for %s"%r.final_url)
             except RequestFailed as failure:
                 if failure.response.status_int == 502:
-                    logging.error("Fail whale says slow down!")
+                    logging.info("Fail whale says slow down!")
                 else:
                     logging.error("%s while retrieving %s",
                         failure.response.status,
@@ -58,7 +60,7 @@ class TwitterResource(Resource):
                     # The whale says slow WAY down!
                     delay = 240
                 time.sleep(delay)
-        raise Exception("Epic Fail Whale! - %s"%r.final_url)
+        raise Exception("Epic Fail Whale! - %s"%path)
 
     def get_ids(self, path, user_id, **kwargs):
         ids=self.get_d(

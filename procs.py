@@ -35,5 +35,4 @@ def create_slaves(Proc):
     for x in xrange(settings.slaves):
         slave_id = string.letters[x]
         p = Process(target=_run_slave, args=(Proc,slave_id,))
-        p.daemon = True
         p.start()
