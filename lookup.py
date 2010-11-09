@@ -37,19 +37,17 @@ class LookupMaster(LocalProc):
         print "starting lookup"
         logging.info("started lookup")
         try:
-            while not self.halt and len(self.scores)<5000:
-                logging.info("calc_cutoff")
-                cutoff = self.calc_cutoff()
+            while not self.halt:
+                if self.should_pick():
+                    logging.info("calc_cutoff")
+                    cutoff = self.calc_cutoff()
 
-                logging.info("pick_users with score %d", cutoff)
-                logging.info("scores: %d lookups %d",len(self.scores),self.lookups)
-                print "scores: %d lookups %d"%(len(self.scores),self.lookups)
-                self.pick_users(cutoff)
+                    logging.info("pick_users with score %d", cutoff)
+                    self.pick_users(cutoff)
+                    print "scores:%d lookups:%d"%(len(self.scores),self.lookups)
 
-                logging.info("waiting")
-                while self.should_wait() and not self.halt:
-                    logging.info("read_scores")
-                    self.read_scores()
+                logging.info("read_scores")
+                self.read_scores()
         except:
             logging.exception("exception caused HALT")
             import pdb
@@ -117,10 +115,10 @@ class LookupMaster(LocalProc):
                 self.scores.set_state(uid, scoredict.LOOKUP)
                 self.lookups+=1
 
-    def should_wait(self):
+    def should_pick(self):
         ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
         logging.info("ready is %d",ready)
-        return ready > settings.crawl_ratio*(len(self.scores)-self.lookups)
+        return ready < settings.crawl_ratio*(len(self.scores)-self.lookups)
 
 
 class LookupSlave(LocalProc):

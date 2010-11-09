@@ -21,6 +21,7 @@ from procs import LocalProc, create_slaves
 
 HALT = False
 def set_halt(x=None,y=None):
+    print "halting"
     global HALT
     HALT=True
 signal.signal(signal.SIGINT, set_halt)
