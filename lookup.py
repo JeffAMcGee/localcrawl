@@ -60,7 +60,8 @@ class LookupMaster(LocalProc):
 
     def read_scores(self):
         job = None
-        for x in xrange(100000):
+        stop = 10000000 if self.halt else 100000
+        for x in xrange(stop):
             try:
                 job = self.stalk.reserve(600)
                 if job is None:
