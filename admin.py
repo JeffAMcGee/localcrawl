@@ -6,6 +6,7 @@ import itertools
 import time
 import os,errno
 import logging
+import gzip
 from collections import defaultdict
 from datetime import datetime
 from operator import itemgetter
@@ -41,8 +42,31 @@ def stop_lookup():
     stalk.use(settings.region+"_lookup_done")
     stalk.put('halt',0)
 
-def all_users()
+
+def all_users():
     return db.paged_view('_all_docs',include_docs=True,startkey='U',endkey='V')
+
+
+def count_users(key):
+    counts = defaultdict(int)
+    for u in all_users():
+        counts[u['doc'].get(key,None)]+=1
+    for k in sorted(counts.keys()):
+        print "%r\t%d"%(k,counts[k])
+
+def import_gz(path):
+    f = gzip.GzipFile(path)
+    for l in f:
+        db.save_doc(json.loads(l))
+    f.close()
+
+
+def export_gz(path):
+    f = gzip.GzipFile(path,'w')
+    for d in db.paged_view('_all_docs',include_docs=True):
+        del d['doc']['_rev']
+        print >>f,json.dumps(d['doc'])
+    f.close()
 
 
 def rm_next_crawl():
