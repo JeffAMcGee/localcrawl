@@ -41,22 +41,9 @@ def stop_lookup():
     stalk.use(settings.region+"_lookup_done")
     stalk.put('halt',0)
 
+def all_users()
+    return db.paged_view('_all_docs',include_docs=True,startkey='U',endkey='V')
 
-def print_counts():
-    "determine how unique a key is - don't try to use this on a big dataset!"
-    counts = defaultdict(lambda: defaultdict(int))
-
-    res = db.view('user/screen_name',include_docs=True)
-    for d in res:
-        for k,v in d['doc'].iteritems():
-            if not isinstance(v,list):
-                counts[k][v]+=1
-
-    for k,d in counts.iteritems():
-        print k
-        for v in sorted(d.keys()):
-            print "%d\t%r"%(d[v],v)
-        print
 
 def rm_next_crawl():
     """Remove the next_crawl_date field if it shouldn't be there.  This
@@ -68,6 +55,7 @@ def rm_next_crawl():
             del user['doc']['ncd']
             db.save_doc(user['doc'])
 
+
 def make_jeff_db():
     """Make a subset of 1% of the database - user docs and tweets for users
     whose user_id ends in 58 (i.e. @JeffAMcGee)"""
@@ -77,20 +65,10 @@ def make_jeff_db():
             jeff.save_doc(row['doc'])
 
 
-def rm_local():
-    """Move everything in the local property into the user.  This code is no
-    longer needed."""
-    for user in db.paged_view('user/screen_name',include_docs=True):
-        if 'l' in user['doc']:
-            user['doc'].update(user['doc']['l'])
-            del user['doc']['l']
-            db.save_doc(user['doc'])
-
-
 def analyze():
     "Find out how the scoring algorithm did."
     scores = Scores()
-    scores.read(settings.lookup_in)
+    scores.read(settings.lookup_out)
     locs = (0,.5,1)
     weights =(0,settings.mention_weight,1)
     counts = dict(
@@ -101,8 +79,7 @@ def analyze():
             for loc in locs))
         for score in xrange(BUCKETS))
 
-    view = Model.database.paged_view('user/screen_name',include_docs=True)
-    for user in (User(d['doc']) for d in view):
+    for user in (User(d['doc']) for d in all_users()):
         user.local_prob
         state, rfs, ats = scores.split(as_int_id(user._id))
         user.rfriends_score = rfs
@@ -130,9 +107,8 @@ def force_lookup():
     # FIXME: ratio of locals to non-locals taken from a spreadsheet - it
     # should come from analyze()!
     probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
-    view = Model.database.paged_view('user/screen_name',include_docs=True)
     res = TwitterResource()
-    for user in (User(d['doc']) for d in view):
+    for user in (User(d['doc']) for d in all_users()):
         if user.local_prob != 1:
             score = log_score(user.rfriends_score, user.mention_score)
             if( user.local_prob==.5
