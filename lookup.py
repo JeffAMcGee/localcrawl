@@ -141,9 +141,17 @@ class LookupSlave(LocalProc):
 
     def run(self):
         while True:
-            # reserve blocks to wait when x is 0, but returns None for 1-19
-            jobs = (self.stalk.reserve(0 if x else None) for x in xrange(20))
-            jobs = [j for j in jobs if j is not None]
+            jobs = []
+            for x in xrange(20):
+                # reserve blocks to wait when x is 0, but returns None for 1-19
+                try:
+                    j = self.stalk.reserve(0 if x else None)
+                except beanstalkc.DeadlineSoon:
+                    break
+                if j is None:
+                    break
+                jobs.append(j)
+
             bodies = [JobBody.from_job(j) for j in jobs]
             users =self.res.user_lookup([b._id for b in bodies])
 
