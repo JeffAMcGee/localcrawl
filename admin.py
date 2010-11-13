@@ -54,6 +54,20 @@ def count_users(key):
     for k in sorted(counts.keys()):
         print "%r\t%d"%(k,counts[k])
 
+
+def count_locations(path='counts'):
+    counts = defaultdict(int)
+    for u in all_users():
+        if u['doc'].get('prob',0)==1:
+            loc = u['doc'].get('loc',"")
+            norm = " ".join(re.split('[^0-9a-z]+', loc.lower())).strip()
+            counts[norm]+=1
+    f = open(path,'w')
+    for k,v in sorted(counts.iteritems(),key=itemgetter(1)):
+        print>>f, "%r\t%d"%(k,v)
+    f.close()
+
+
 def import_gz(path):
     f = gzip.GzipFile(path)
     for l in f:
