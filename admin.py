@@ -17,6 +17,7 @@ import beanstalkc
 from settings import settings
 import twitter
 from models import *
+from scoredict import Scores, BUCKETS, log_score
 
 db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()
@@ -122,7 +123,7 @@ def analyze():
         state, rfs, ats = scores.split(as_int_id(user._id))
         user.rfriends_score = rfs
         user.mention_score = ats
-        user.save()
+        #user.save()
         if user.local_prob in locs:
             for weight in weights:
                 score = log_score(rfs,ats,weight)
