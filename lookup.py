@@ -47,7 +47,7 @@ class LookupMaster(LocalProc):
                         print "halt because cutoff is 0"
                         break
                     logging.info("pick_users with score %d", cutoff)
-                    self.pick_users(cutoff)
+                    self.pick_users(max(2,cutoff))
                     print "scores:%d lookups:%d"%(len(self.scores),self.lookups)
 
                 logging.info("read_scores")
