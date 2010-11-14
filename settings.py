@@ -17,6 +17,7 @@ settings = SettingsBunch(
     mention_weight = .5,
     crawl_ratio = .1,
     force_cutoff = 8,
+    min_cutoff = 2,
     lookup_in = 'lookup.in',
     lookup_out = 'lookup.out',
     log_dir = 'logs',
