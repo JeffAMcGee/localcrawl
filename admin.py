@@ -7,6 +7,7 @@ import time
 import os,errno
 import logging
 import gzip
+import sys
 from collections import defaultdict
 from datetime import datetime
 from operator import itemgetter
@@ -17,7 +18,10 @@ import beanstalkc
 from settings import settings
 import twitter
 from models import *
+from gisgraphy import GisgraphyResource
+from scoredict import Scores
 
+gisgraphy = GisgraphyResource()
 db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()
 Model.database = db
@@ -76,7 +80,7 @@ def import_gz(path):
 
 
 def export_gz(path):
-    f = gzip.GzipFile(path,'w')
+    f = gzip.GzipFile(path,'w',1)
     for d in db.paged_view('_all_docs',include_docs=True):
         del d['doc']['_rev']
         print >>f,json.dumps(d['doc'])
@@ -101,6 +105,29 @@ def make_jeff_db():
     for row in db.paged_view('user/and_tweets',include_docs=True):
         if row['key'][0][-2:] == '58':
             jeff.save_doc(row['doc'])
+
+
+def copy_locals():
+    scores = Scores()
+    scores.read(settings.lookup_out)
+    User.database = CouchDB('http://127.0.0.1:5984/hou',True)
+    for user in (User(d['doc']) for d in all_users()):
+        if user.local_prob==1:
+            if strictly_local(user.location):
+                state, rfs, ats = scores.split(as_int_id(user._id))
+                user.rfriends_score = rfs
+                user.mention_score = ats
+                user.save()
+            else:
+                print "ignoring '%s'"%user.location
+
+
+def strictly_local(loc):
+    place = gisgraphy.twitter_loc(loc,True)
+    if place.name=='Sugar Land':
+        if 'sugar' not in loc.lower():
+            return False
+    return gisgraphy.in_local_box(place.to_d())
 
 
 def analyze():
@@ -189,3 +216,7 @@ def krishna_export(start=[2010],end=None):
                         print>>f,"%d %s %s %s"%(ts,t['_id'],t['uid'],at)
                 else:
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
+
+if __name__ == '__main__':
+    if len(sys.argv)>1:
+        locals()[sys.argv[1]](*sys.argv[2:])

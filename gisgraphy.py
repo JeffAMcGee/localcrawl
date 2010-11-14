@@ -28,9 +28,8 @@ class GisgraphyResource(Resource):
             **kwargs)
         return json.loads(r.body_string())["response"]["docs"]
 
-    def twitter_loc(self, q):
-        if not q:
-            return None
+    def twitter_loc(self, q, strict=False):
+        if not q: return None
         # check for "30.639, -96.347" style coordinates
         match = self.COORD_RE.search(q)
         if match:
@@ -42,11 +41,13 @@ class GisgraphyResource(Resource):
         #try gisgraphy
         q = q.lower().strip().replace('-','/').replace(',',', ')
         q = ''.join(re.split('[|&!]',q))
+        if not q: return None
         results = self.fulltextsearch(q)
         # Is there a local place in the first 10 results?
-        for place in results:
-            if self.in_local_box(place):
-                return GeonamesPlace(place)
+        if not strict:
+            for place in results:
+                if self.in_local_box(place):
+                    return GeonamesPlace(place)
         # otherwise, return the first result
         if len(results)>0:
             return GeonamesPlace(results[0])
