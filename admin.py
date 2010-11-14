@@ -129,6 +129,25 @@ def strictly_local(loc):
             return False
     return gisgraphy.in_local_box(place.to_d())
 
+def grouper(n, iterable, fillvalue=None):
+    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(*args, fillvalue=fillvalue)
+
+
+def count_sn(path):
+    lost =0
+    found =0
+    sns = (sn.strip() for sn in open(path))
+    for group in grouper(20,sns):
+        for user in res.user_lookup([], screen_name=','.join(group)):
+            if user._id in db:
+                found+=1
+                print "found %s - %s"%(user.screen_name,user._id)
+            else:
+                lost+=1
+                print "missed %s - %s"%(user.screen_name,user._id)
+    print "lost:%d found:%d"%(lost,found)
 
 def analyze():
     "Find out how the scoring algorithm did."
