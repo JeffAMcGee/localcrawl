@@ -1,5 +1,6 @@
 # This is a tool for testing and administrative tasks.  It is designed to
-# be %run in ipython.
+# be %run in ipython.  If you import it from another module, you're doing
+# something wrong.
 
 import json
 import itertools
@@ -25,6 +26,8 @@ gisgraphy = GisgraphyResource()
 db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()
 Model.database = db
+logging.basicConfig(level=logging.INFO)
+
 try:
     stalk = beanstalkc.Connection()
 except:
@@ -49,6 +52,10 @@ def stop_lookup():
 
 def all_users():
     return db.paged_view('_all_docs',include_docs=True,startkey='U',endkey='V')
+
+
+def all_tweets():
+    return db.paged_view('_all_docs',include_docs=True,startkey='T',endkey='U')
 
 
 def count_users(key):
@@ -120,6 +127,15 @@ def copy_locals():
                 user.save()
             else:
                 print "ignoring '%s'"%user.location
+
+
+def copy_tweets(input='hou_ids',dbname='hou'):
+    out_db = CouchDB('http://127.0.0.1:5984/'+dbname,True)
+    locals = set(l.strip() for l in open(input))
+    for t in all_tweets():
+        if as_int_id(t['id'])>27882000000 and t['doc']['uid'] in locals:
+            del t['doc']['_rev']
+            out_db.save_doc(t['doc'])
 
 
 def strictly_local(loc):

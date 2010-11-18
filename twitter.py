@@ -92,14 +92,14 @@ class TwitterResource(Resource):
                 followers=self.followers_ids(user_id),
         )
 
-    def user_timeline(self, user_id, **kwargs):
+    def user_timeline(self, user_id, count=200, **kwargs):
         timeline = self.get_d(
             "statuses/user_timeline.json",
             user_id=as_int_id(user_id),
             trim_user=1,
             include_rts=1,
             include_entities=1,
-            count=200,
+            count=count,
             **kwargs
         )
         return [Tweet(t) for t in timeline]
