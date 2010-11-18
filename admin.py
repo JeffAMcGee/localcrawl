@@ -7,6 +7,7 @@ import itertools
 import time
 import os,errno
 import logging
+import random
 import gzip
 import sys
 from collections import defaultdict
@@ -239,18 +240,18 @@ def random_tweets():
         'malesuada augue. etiam lobortis mauris nec enim pretium id luctus sed.'
     )
 
-    rand = couchdb('http://127.0.0.1:5984/rand',True)
+    rand = CouchDB('http://127.0.0.1:5984/rand',True)
     seq = CouchDB('http://127.0.0.1:5984/seq',True)
     flat = open('tweets.json','w')
-    ids = [i**3 for i in xrange(10)]
+    ids = [i**3 for i in xrange(1000000)]
     random.shuffle(ids)
     for tid in ids:
         t = Tweet(
             mentions = ['U123456789','U1248163264'],
             geo = (-95.123,25.367),
-            created_at = dt.now(),
+            created_at = datetime.datetime.now(),
             favorited = False,
-            text = LOREM[0:random.randint(20,140)],
+            text = lorem[0:random.randint(20,140)],
             user_id = 'U106582358', #@Jeffamcgee
         )
         t.tweet_id=tid
