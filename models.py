@@ -20,7 +20,7 @@ def as_int_id(id):
 class TwitterModel(Model):
     def __init__(self, from_dict=None, **kwargs):
         Model.__init__(self, from_dict, **kwargs)
-        if self._id is None and 'id' in from_dict:
+        if self._id is None and from_dict and 'id' in from_dict:
             self._id = from_dict['id']
     
     def attempt_save(self):
@@ -99,6 +99,9 @@ class Tweet(TwitterModel):
     place = Property('plc')
     text = TextProperty('tx')
     user_id = TwitterIdProperty('uid','U')
+
+    # this is only for testing the automagic ids
+    tweet_id = TwitterIdProperty('tid','T')
 
     def __init__(self, from_dict=None, **kwargs):
         TwitterModel.__init__(self, from_dict, **kwargs)

@@ -232,6 +232,35 @@ def mkdir_p(path):
             raise
 
 
+def random_tweets():
+    '''this creates test tweets for testing couchdb'''
+    lorem = (
+        'lorem ipsum dolor sit amet, consectetur adipiscing elit. curabitur id '+
+        'malesuada augue. etiam lobortis mauris nec enim pretium id luctus sed.'
+    )
+
+    rand = couchdb('http://127.0.0.1:5984/rand',True)
+    seq = CouchDB('http://127.0.0.1:5984/seq',True)
+    flat = open('tweets.json','w')
+    ids = [i**3 for i in xrange(10)]
+    random.shuffle(ids)
+    for tid in ids:
+        t = Tweet(
+            mentions = ['U123456789','U1248163264'],
+            geo = (-95.123,25.367),
+            created_at = dt.now(),
+            favorited = False,
+            text = LOREM[0:random.randint(20,140)],
+            user_id = 'U106582358', #@Jeffamcgee
+        )
+        t.tweet_id=tid
+        seq.save(t)
+        t._id=tid
+        t.tweet_id=None
+        rand.save(t)
+        print >>flat,json.dumps(t.to_d())
+
+
 def krishna_export(start=[2010],end=None):
     "export the tweets for Krishna's crawler"
     view = Model.database.paged_view(
