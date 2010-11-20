@@ -82,8 +82,8 @@ def count_locations(path='counts'):
 
 def import_gz(path):
     f = gzip.GzipFile(path)
-    for l in f:
-        db.save_doc(json.loads(l))
+    for g in grouper(1000,f):
+        db.bulk_save(json.loads(l) for l in g if l)
     f.close()
 
 
@@ -238,12 +238,21 @@ def baseN(num,b=36,numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
     return baseN(num//b, b, numerals).lstrip("0")+numerals[num%b] if num else "0"
 
 
-def random_docs():
-    shuf = CouchDB('http://127.0.0.1:5984/shuf',True)
-    ids = [baseN(i) for i in xrange(900000,1000000)]
-    random.shuffle(ids)
-    for tid in ids:
-        shuf.save_doc({'_id':tid})
+def random_docs(count=100000):
+    from couchdbkit import Database
+    order = Database('http://127.0.0.1:5984/order',True)
+    for _id in xrange(count):
+        order.save_doc({'_id':str(_id)})
+    rand = Database('http://127.0.0.1:5984/rand',True)
+    for _id in sorted(xrange(count), key=lambda x:x%3):
+        rand.save_doc({'_id':str(_id)})
+
+def bulk_test():
+    from couchdbkit import Database
+    db = Database('http://127.0.0.1:5984/bulk',True)
+    for x in xrange(100):
+        docs = [ {'_id':str(x*1000+y)} for y in xrange(1000)]
+        db.bulk_save(docs)
 
  
 def random_tweets():
