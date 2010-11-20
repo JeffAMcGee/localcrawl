@@ -137,6 +137,7 @@ def copy_tweets(input='hou_ids',dbname='hou'):
         if as_int_id(t['id'])>27882000000 and t['doc']['uid'] in locals:
             del t['doc']['_rev']
             out_db.save_doc(t['doc'])
+    
 
 
 def strictly_local(loc):
@@ -233,6 +234,18 @@ def mkdir_p(path):
             raise
 
 
+def baseN(num,b=36,numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
+    return baseN(num//b, b, numerals).lstrip("0")+numerals[num%b] if num else "0"
+
+
+def random_docs():
+    shuf = CouchDB('http://127.0.0.1:5984/shuf',True)
+    ids = [baseN(i) for i in xrange(900000,1000000)]
+    random.shuffle(ids)
+    for tid in ids:
+        shuf.save_doc({'_id':tid})
+
+ 
 def random_tweets():
     '''this creates test tweets for testing couchdb'''
     lorem = (
@@ -245,6 +258,7 @@ def random_tweets():
     flat = open('tweets.json','w')
     ids = [i**3 for i in xrange(1000000)]
     random.shuffle(ids)
+    counter = 0
     for tid in ids:
         t = Tweet(
             mentions = ['U123456789','U1248163264'],
@@ -260,6 +274,10 @@ def random_tweets():
         t.tweet_id=None
         rand.save(t)
         print >>flat,json.dumps(t.to_d())
+
+        counter+=1
+        if counter==520000:
+            return
 
 
 def krishna_export(start=[2010],end=None):
