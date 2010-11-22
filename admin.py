@@ -289,6 +289,26 @@ def random_tweets():
             return
 
 
+def min_max_tid(path):
+    view = Model.database.paged_view(
+            'tweet/uid',
+            include_docs=True,
+        )
+    with open(path,'w') as f:
+        for k,g in itertools.groupby(view,itemgetter('key')):
+            l = list(g)
+            min_tweet = min(l,key=lambda x: as_int_id(x['id']))['doc']
+            max_tweet = max(l,key=lambda x: as_int_id(x['id']))['doc']
+            print>>f,json.dumps(dict(
+                uid = k,
+                count = len(l),
+                min_ca = min_tweet['ca'],
+                min_id = min_tweet['_id'],
+                max_ca = max_tweet['ca'],
+                max_id = max_tweet['_id'],
+            ))
+
+
 def krishna_export(start=[2010],end=None):
     "export the tweets for Krishna's crawler"
     view = Model.database.paged_view(
