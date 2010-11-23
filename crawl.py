@@ -33,8 +33,8 @@ class CrawlMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"crawl")
         self.waiting = set()
-        self.todo = Queue
-        self.done = Queue
+        self.todo = Queue()
+        self.done = Queue()
 
     def run(self):
         print "started crawl"
@@ -86,7 +86,6 @@ class CrawlSlave(LocalProc):
                 uid = self.todo.get()
                 user = User.get_id(uid)
                 self.crawl(user)
-                self.update(user)
                 self.done.put(uid)
                 self.todo.task_done()
                 if self.res.remaining < 10:
@@ -94,7 +93,7 @@ class CrawlSlave(LocalProc):
                     logging.info("goodnight for %r",dt)
                     time.sleep(dt.seconds)
             except Exception as ex:
-                if uid:
+                if user:
                     logging.exception("exception for user %s"%user.to_d())
                 else:
                     logging.exception("exception and user is None")
@@ -106,6 +105,7 @@ class CrawlSlave(LocalProc):
 
         count = 0
         max_id = None
+        last_tid = None
         while since_id != max_id:
             try:
                 tweets = self.res.user_timeline(
@@ -119,6 +119,8 @@ class CrawlSlave(LocalProc):
             if not tweets:
                 logging.warn("no tweets found after %d for %s",count,user._id)
                 break
+            if not last_tid:
+                last_tid = tweets[0]._id
             count+=len(tweets)
             max_id =as_int_id(tweets[-1]._id)-1
             for tweet in tweets:
@@ -131,16 +133,19 @@ class CrawlSlave(LocalProc):
             if count>=3100:
                 logging.error("hit max tweets after %d for %s",count,user._id)
                 break
+        self.update(user,count,last_tid)
 
-    def update(user):
+    def update(self,user,count,last_tid):
+        if last_tid:
+            user.last_tid = last_tid
         now = datetime.utcnow()
-        delta = now - self.waiting[user._id]
+        delta = now - user.last_crawl_date
         seconds = delta.seconds + delta.days*24*3600
-        tph = (3600.0*d['count']/seconds + user.tweets_per_hour)/2
+        tph = (3600.0*count/seconds + user.tweets_per_hour)/2
         user.tweets_per_hour = tph
         hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
         user.next_crawl_date = now+timedelta(hours=hours)
-        del self.waiting[user._id]
+        user.last_crawl_date = now
         user.save()
 
 

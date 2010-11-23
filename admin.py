@@ -95,15 +95,14 @@ def export_gz(path):
     f.close()
 
 
-def rm_next_crawl():
-    """Remove the next_crawl_date field if it shouldn't be there.  This
-    code is no longer needed."""
-    latest = db.view('user/latest',group=True)
-    latest = set(l['key'] for l in latest)
-    for user in db.paged_view('user/next_crawl',include_docs=True):
-        if user['id'] not in latest:
-            del user['doc']['ncd']
-            db.save_doc(user['doc'])
+def set_latest():
+    """Fill in last_tid based on the latest view. This
+    code will only be used once per database."""
+    for row in db.view('user/latest',group=True)
+        user = User.get_id(row['key'])
+        user.last_tid = row['value'][0]
+        user.last_crawl_date = datetime(2010,11,12)
+        user.save()
 
 
 def make_jeff_db():

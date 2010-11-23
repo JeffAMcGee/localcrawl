@@ -60,8 +60,8 @@ class User(TwitterModel):
     tweets_per_hour = FloatProperty('tph')
     lookup_done = BoolProperty('ld')
     next_crawl_date = DateTimeProperty('ncd')
-    last_tid = TwitterIdProperty('ltid')
-    last_tweet_date = DateTimeProperty('ltdt')
+    last_tid = TwitterIdProperty('ltid','T')
+    last_crawl_date = DateTimeProperty('lcd')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     local_prob = FloatProperty('prob')
@@ -148,9 +148,3 @@ class LookupJobBody(JobBody):
     mention_score = IntProperty('ats')
     done = BoolProperty('done')
     force = BoolProperty('force')
-
-class CrawlJobBody(JobBody):
-    _id = TwitterIdProperty('_id','U')
-    count = IntProperty('c')
-    last_tid = TwitterIdProperty('ltid')
-    last_tweet_date = DateTimeProperty('ltdt')

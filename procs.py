@@ -38,6 +38,6 @@ def _run_slave(Proc,slave_id,*args):
 def create_slaves(Proc,*args):
     for x in xrange(settings.slaves):
         slave_id = string.letters[x]
-        run_args = [Proc,slave_id]+args
-        p = Process(target=_run_slave, args=(*run_args))
+        run_args = (Proc,slave_id)+args
+        p = Process(target=_run_slave, args=run_args)
         p.start()
