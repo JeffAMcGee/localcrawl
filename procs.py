@@ -26,8 +26,8 @@ class LocalProc(object):
         logging.basicConfig(filename=filepath,level=logging.INFO)
 
 
-def _run_slave(Proc,slave_id):
-    p = Proc(slave_id)
+def _run_slave(Proc,slave_id,*args):
+    p = Proc(slave_id,*args)
     try:
         p.run()
     except:
@@ -35,8 +35,9 @@ def _run_slave(Proc,slave_id):
         print "exception killed proc"
 
 
-def create_slaves(Proc):
+def create_slaves(Proc,*args):
     for x in xrange(settings.slaves):
         slave_id = string.letters[x]
-        p = Process(target=_run_slave, args=(Proc,slave_id,))
+        run_args = [Proc,slave_id]+args
+        p = Process(target=_run_slave, args=(*run_args))
         p.start()

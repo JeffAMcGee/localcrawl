@@ -8,6 +8,7 @@ import time
 from itertools import groupby
 from restkit import Unauthorized
 import logging
+from multiprocessing import Queue
 
 import maroon
 from maroon import *
@@ -32,95 +33,83 @@ class CrawlMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"crawl")
         self.waiting = set()
+        self.todo = Queue
+        self.done = Queue
 
     def run(self):
         print "started crawl"
         logging.info("started crawl")
         try:
             while not HALT:
-                logging.info("queue_crawl")
                 self.queue_crawl()
-                logging.info("read_crawled, %d",len(self.waiting))
-                self.read_crawled()
         except:
             logging.exception("exception caused HALT")
-            set_halt()
-        while self.waiting:
-            logging.info("read_crawled after HALT, %d",len(self.waiting))
-            try:
-                self.read_crawled()
-            except:
-                logging.exception("exception after HALT")
+        self.todo.close()
+        self.todo.join()
+        print "done"
 
     def queue_crawl(self):
+        logging.info("queue_crawl")
         now = datetime.utcnow().timetuple()[0:6]
-        for user in User.paged_view('user/next_crawl',endkey=now):
-            if len(self.waiting)>50: return # let the queue empty a bit
-            if user._id in self.waiting: continue # they are queued
-            if not user.latest: continue # they have never tweeted
+        for user in User.database.paged_view('user/next_crawl',endkey=now):
+            uid = user['id']
+            if HALT: break
+            if uid in self.waiting: continue # they are queued
             self.waiting.add(uid)
-            body = CrawlJobBody(user.to_d())
-            #job.put(stalk)
-            print body.to_d()
-
+            self.todo.put(uid)
+            
+            if len(self.waiting)%100==0:
+                read_crawled()
+                # let the queue empty a bit
 
     def read_crawled(self):
-        job = self.stalk.reserve(60)
-        while job is not None:
-            d = json.loads(job.body)
-            logging.debug(d)
-            user = User.get_id(d['uid'])
-            now = datetime.utcnow()
-            delta = now - self.waiting[user._id]
-            seconds = delta.seconds + delta.days*24*3600
-            tph = (3600.0*d['count']/seconds + user.tweets_per_hour)/2
-            user.tweets_per_hour = tph
-            hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
-            user.next_crawl_date = now+timedelta(hours=hours)
-            del self.waiting[user._id]
-            user.save()
-            job.delete()
-            job = self.stalk.reserve(60)
+        logging.info("read_crawled, %d",len(self.waiting))
+        try:
+            while True:
+                uid = self.done.get_nowait()
+                self.waiting.remove(uid)
+        except Queue.Empty:
+            return
 
 
 class CrawlSlave(LocalProc):
-    def __init__(self,slave_id):
-        LocalProc.__init__(self,'crawl',slave_id)
+    def __init__(self, slave_id, todo, done):
+        LocalProc.__init__(self,'crawl', slave_id)
         self.res = TwitterResource()
+        self.todo = todo
+        self.done = done
 
     def run(self):
         while True:
-            job=None
+            user=None
             try:
-                job = self.stalk.reserve(None)
-                d = self._crawl_job(job)
-                self.stalk.put(json.dumps(d),ttr=settings.crawl_ttr)
-                job.delete()
-
+                uid = self.todo.get()
+                user = User.get_id(uid)
+                self.crawl(user)
+                self.update(user)
+                self.done.put(uid)
+                self.todo.task_done()
                 if self.res.remaining < 10:
                     dt = (self.res.reset_time-datetime.utcnow())
                     logging.info("goodnight for %r",dt)
                     time.sleep(dt.seconds)
             except Exception as ex:
-                if job:
-                    logging.exception("exception for job %s"%job.body)
-                    job.bury()
+                if uid:
+                    logging.exception("exception for user %s"%user.to_d())
                 else:
-                    logging.exception("exception and job is None")
+                    logging.exception("exception and user is None")
             logging.info("api calls remaining: %d",self.res.remaining)
 
-    def _crawl_job(self, job):
-        d = json.loads(job.body)
-        uid = d['uid']
-        since_id = as_int_id(d['last_tid'])-1
-        logging.debug("%r",d)
+    def crawl(self, user):
+        since_id = as_int_id(user.last_tid)-1
+        logging.debug("visiting %s - %s",user._id,user.screen_name)
 
         count = 0
         max_id = None
-        while count<=3000 and since_id != max_id:
+        while since_id != max_id:
             try:
                 tweets = self.res.user_timeline(
-                    uid,
+                    user._id,
                     max_id = max_id,
                     since_id = since_id,
                 )
@@ -128,9 +117,8 @@ class CrawlSlave(LocalProc):
                 logging.warn("unauthorized!")
                 break
             if not tweets:
-                logging.warn("no tweets found after %d for %s",count,uid)
+                logging.warn("no tweets found after %d for %s",count,user._id)
                 break
-            job.touch()
             count+=len(tweets)
             max_id =as_int_id(tweets[-1]._id)-1
             for tweet in tweets:
@@ -138,12 +126,25 @@ class CrawlSlave(LocalProc):
                     #FIXME: replace with save??
                     tweet.attempt_save()
             if len(tweets)<175:
-                #there are no more tweets, and since_id+1 for was deleted
+                #there are no more tweets, and since_id+1 was deleted
+                break
+            if count>=3100:
+                logging.error("hit max tweets after %d for %s",count,user._id)
                 break
 
-        return dict(uid=uid, count=count)
+    def update(user):
+        now = datetime.utcnow()
+        delta = now - self.waiting[user._id]
+        seconds = delta.seconds + delta.days*24*3600
+        tph = (3600.0*d['count']/seconds + user.tweets_per_hour)/2
+        user.tweets_per_hour = tph
+        hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
+        user.next_crawl_date = now+timedelta(hours=hours)
+        del self.waiting[user._id]
+        user.save()
+
 
 if __name__ == '__main__':
-    create_slaves(CrawlSlave)
     proc = CrawlMaster()
+    create_slaves(CrawlSlave, proc.todo, proc.done)
     proc.run()
