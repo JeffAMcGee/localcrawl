@@ -31,63 +31,57 @@ signal.signal(signal.SIGUSR1, set_halt)
 class CrawlMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"crawl")
+        self.waiting = set()
 
     def run(self):
         print "started crawl"
         logging.info("started crawl")
-        waiting = dict()
         try:
             while not HALT:
                 logging.info("queue_crawl")
-                self.queue_crawl(waiting)
-                logging.info("read_crawled, %d",len(waiting))
-                self.read_crawled(waiting)
+                self.queue_crawl()
+                logging.info("read_crawled, %d",len(self.waiting))
+                self.read_crawled()
         except:
             logging.exception("exception caused HALT")
             set_halt()
-        while waiting:
-            logging.info("read_crawled after HALT, %d",len(waiting))
+        while self.waiting:
+            logging.info("read_crawled after HALT, %d",len(self.waiting))
             try:
-                self.read_crawled(waiting)
+                self.read_crawled()
             except:
                 logging.exception("exception after HALT")
 
-    def queue_crawl(self, waiting):
+    def queue_crawl(self):
         now = datetime.utcnow().timetuple()[0:6]
-        view = Model.database.paged_view('user/next_crawl', endkey=now)
-        for user in view:
-            if len(waiting)>500: return # let the queue empty a bit
-            uid = user['id']
-            if uid in waiting: continue # they are queued
-            latest = Model.database.view('user/latest', key=uid)
-            if not len(latest): continue # they have never tweeted
-            value = latest.one()['value']
-            waiting[uid] = datetime(*value[1])
-            d = dict(uid=uid,since_id=value[0])
-            self.stalk.put(json.dumps(d))
+        for user in User.paged_view('user/next_crawl',endkey=now):
+            if len(self.waiting)>50: return # let the queue empty a bit
+            if user._id in self.waiting: continue # they are queued
+            if not user.latest: continue # they have never tweeted
+            self.waiting.add(uid)
+            body = CrawlJobBody(user.to_d())
+            #job.put(stalk)
+            print body.to_d()
 
 
-    def read_crawled(self, waiting):
+    def read_crawled(self):
         job = self.stalk.reserve(60)
         while job is not None:
             d = json.loads(job.body)
             logging.debug(d)
             user = User.get_id(d['uid'])
             now = datetime.utcnow()
-            delta = now - waiting[user._id]
+            delta = now - self.waiting[user._id]
             seconds = delta.seconds + delta.days*24*3600
             tph = (3600.0*d['count']/seconds + user.tweets_per_hour)/2
             user.tweets_per_hour = tph
             hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
             user.next_crawl_date = now+timedelta(hours=hours)
-            del waiting[user._id]
+            del self.waiting[user._id]
             user.save()
             job.delete()
             job = self.stalk.reserve(60)
 
-
-
-#signal.signal(signal.SIGINT, lambda x, y: pdb.set_trace())
 
 class CrawlSlave(LocalProc):
     def __init__(self,slave_id):
@@ -118,7 +112,7 @@ class CrawlSlave(LocalProc):
     def _crawl_job(self, job):
         d = json.loads(job.body)
         uid = d['uid']
-        since_id = as_int_id(d['since_id'])-1
+        since_id = as_int_id(d['last_tid'])-1
         logging.debug("%r",d)
 
         count = 0

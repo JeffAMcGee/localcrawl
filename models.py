@@ -60,6 +60,8 @@ class User(TwitterModel):
     tweets_per_hour = FloatProperty('tph')
     lookup_done = BoolProperty('ld')
     next_crawl_date = DateTimeProperty('ncd')
+    last_tid = TwitterIdProperty('ltid')
+    last_tweet_date = DateTimeProperty('ltdt')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     local_prob = FloatProperty('prob')
@@ -87,6 +89,7 @@ class User(TwitterModel):
 
 class Tweet(TwitterModel):
     _id = TwitterIdProperty('_id','T')
+    tid = TwitterIdProperty('tid','T')
     mentions = SlugListProperty('ats') #based on entities
 
     #properties from twitter
@@ -132,15 +135,22 @@ class Relationships(TwitterModel):
         return [u for u in lil if u in big]
 
 class JobBody(ModelPart):
+    def put(self, stalk):
+        stalk.put(json.dumps(self.to_d()),ttr=settings.beanstalkd_ttr)
+
+    @classmethod
+    def from_job(cls, job):
+        return cls(json.loads(job.body))
+
+class LookupJobBody(JobBody):
     _id = TwitterIdProperty('_id','U')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     done = BoolProperty('done')
     force = BoolProperty('force')
 
-    def put(self, stalk):
-        stalk.put(json.dumps(self.to_d()),ttr=settings.lookup_ttr)
-
-    @classmethod
-    def from_job(cls, job):
-        return JobBody(json.loads(job.body))
+class CrawlJobBody(JobBody):
+    _id = TwitterIdProperty('_id','U')
+    count = IntProperty('c')
+    last_tid = TwitterIdProperty('ltid')
+    last_tweet_date = DateTimeProperty('ltdt')

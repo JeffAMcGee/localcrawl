@@ -12,7 +12,7 @@ import sys
 import maroon
 from maroon import *
 
-from models import Relationships, User, Tweet, JobBody, as_local_id, as_int_id
+from models import Relationships, User, Tweet, LookupJobBody, as_local_id, as_int_id
 from twitter import TwitterResource
 from settings import settings
 from gisgraphy import GisgraphyResource
@@ -73,7 +73,7 @@ class LookupMaster(LocalProc):
                     logging.info("starting to halt...")
                     job.delete()
                     return
-                body = JobBody.from_job(job)
+                body = LookupJobBody.from_job(job)
                 if body.done:
                     self.scores.set_state(as_int_id(body._id), scoredict.DONE)
                 else:
@@ -109,7 +109,7 @@ class LookupMaster(LocalProc):
         for uid in self.scores:
             state, rfs, ats = self.scores.split(uid)
             if state==scoredict.NEW and log_score(rfs,ats) >= cutoff:
-                job = JobBody(
+                job = LookupJobBody(
                     _id=as_local_id('U',uid),
                     rfriends_score=rfs,
                     mention_score=ats,
@@ -152,7 +152,7 @@ class LookupSlave(LocalProc):
                     break
                 jobs.append(j)
 
-            bodies = [JobBody.from_job(j) for j in jobs]
+            bodies = [LookupJobBody.from_job(j) for j in jobs]
             users =self.res.user_lookup([b._id for b in bodies])
 
             logging.info("looking at %r"%[u.screen_name for u in users])
@@ -200,7 +200,7 @@ class LookupSlave(LocalProc):
             self.score_new_users(user, rels, tweets)
 
     def score_new_users(self, user, rels, tweets):
-        jobs = defaultdict(JobBody)
+        jobs = defaultdict(LookupJobBody)
         jobs[user._id].done = True
 
         if rels:
