@@ -8,7 +8,8 @@ import time
 from itertools import groupby
 from restkit import Unauthorized
 import logging
-from multiprocessing import Queue, JoinableQueue
+import multiprocessing
+import Queue
 
 import maroon
 from maroon import *
@@ -33,8 +34,8 @@ class CrawlMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"crawl")
         self.waiting = set()
-        self.todo = JoinableQueue()
-        self.done = Queue()
+        self.todo = multiprocessing.JoinableQueue(30)
+        self.done = multiprocessing.Queue()
 
     def run(self):
         print "started crawl"
@@ -61,8 +62,8 @@ class CrawlMaster(LocalProc):
             self.todo.put(uid)
             
             if len(self.waiting)%100==0:
-                read_crawled()
                 # let the queue empty a bit
+                self.read_crawled()
 
     def read_crawled(self):
         logging.info("read_crawled, %d",len(self.waiting))
@@ -82,7 +83,7 @@ class CrawlSlave(LocalProc):
         self.done = done
 
     def run(self):
-        while True:
+        while not HALT:
             user=None
             try:
                 uid = self.todo.get()
@@ -100,6 +101,7 @@ class CrawlSlave(LocalProc):
                 else:
                     logging.exception("exception and user is None")
             logging.info("api calls remaining: %d",self.res.remaining)
+        print "slave is done"
 
     def crawl(self, user):
         since_id = as_int_id(user.last_tid)-1
