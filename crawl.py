@@ -8,7 +8,7 @@ import time
 from itertools import groupby
 from restkit import Unauthorized
 import logging
-from multiprocessing import Queue
+from multiprocessing import Queue, JoinableQueue
 
 import maroon
 from maroon import *
@@ -33,7 +33,7 @@ class CrawlMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"crawl")
         self.waiting = set()
-        self.todo = Queue()
+        self.todo = JoinableQueue()
         self.done = Queue()
 
     def run(self):
@@ -42,6 +42,8 @@ class CrawlMaster(LocalProc):
         try:
             while not HALT:
                 self.queue_crawl()
+                print "naptime"
+                time.sleep(15)
         except:
             logging.exception("exception caused HALT")
         self.todo.close()

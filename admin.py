@@ -11,7 +11,7 @@ import random
 import gzip
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime as dt
 from operator import itemgetter
 
 from couchdbkit.loaders import FileSystemDocsLoader
@@ -98,10 +98,10 @@ def export_gz(path):
 def set_latest():
     """Fill in last_tid based on the latest view. This
     code will only be used once per database."""
-    for row in db.view('user/latest',group=True)
+    for row in db.view('user/latest',group=True):
         user = User.get_id(row['key'])
         user.last_tid = row['value'][0]
-        user.last_crawl_date = datetime(2010,11,12)
+        user.last_crawl_date = dt(2010,11,12)
         user.save()
 
 
@@ -217,7 +217,7 @@ def force_lookup():
                 and not user.lookup_done
             ):
                 user.tweets_per_hour = settings.tweets_per_hour
-                user.next_crawl_date = datetime.utcnow()
+                user.next_crawl_date = dt.utcnow()
                 user.lookup_done = True
                 for tweet in res.user_timeline(user._id):
                     tweet.attempt_save()
@@ -321,7 +321,7 @@ def krishna_export(start=[2010],end=None):
         mkdir_p(os.path.dirname(path))
         with open(path,'w') as f:
             for t in (row['doc'] for row in g):
-                ts = int(time.mktime(datetime(*t['ca']).timetuple()))
+                ts = int(time.mktime(dt(*t['ca']).timetuple()))
                 if t['ats']:
                     for at in t['ats']:
                         print>>f,"%d %s %s %s"%(ts,t['_id'],t['uid'],at)
