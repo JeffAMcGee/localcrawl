@@ -47,8 +47,6 @@ class CrawlMaster(LocalProc):
                 time.sleep(15)
         except:
             logging.exception("exception caused HALT")
-        self.todo.close()
-        self.todo.join()
         print "done"
 
     def queue_crawl(self):
