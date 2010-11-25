@@ -14,6 +14,7 @@ from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
 
+from couchdbkit import ResourceNotFound
 from couchdbkit.loaders import FileSystemDocsLoader
 import beanstalkc
 
@@ -96,14 +97,18 @@ def export_gz(path):
     f.close()
 
 
-def set_latest():
+def set_latest(path="mmt.json"):
     """Fill in last_tid based on the latest view. This
     code will only be used once per database."""
-    for row in db.view('user/latest',group=True):
-        user = User.get_id(row['key'])
-        user.last_tid = row['value'][0]
-        user.last_crawl_date = dt(2010,11,12)
-        user.save()
+    for l in open(path):
+        row = json.loads(l)
+        try:
+            user = User.get_id(row['uid'])
+            user.last_tid = row['max_id']
+            user.last_crawl_date = dt(2010,11,12)
+            user.save()
+        except ResourceNotFound:
+            pass
 
 
 def fake_lu_master():
