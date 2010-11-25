@@ -22,6 +22,7 @@ import twitter
 from models import *
 from gisgraphy import GisgraphyResource
 from scoredict import Scores, BUCKETS, log_score
+import lookup
 
 gisgraphy = GisgraphyResource()
 db = CouchDB(settings.couchdb_root+settings.region,True)
@@ -104,6 +105,38 @@ def set_latest():
         user.last_crawl_date = dt(2010,11,12)
         user.save()
 
+
+def fake_lu_master():
+    proc = lookup.LookupMaster()
+    while not proc.halt:
+        proc.read_scores()
+        print "scores:%d"%len(proc.scores)
+    print "halting"
+    proc.read_scores()
+    proc.scores.dump(settings.lookup_out)
+
+
+def fake_lu_slave():
+    proc = lookup.LookupSlave('y')
+    Relationships.database = CouchDB('http://127.0.0.1:5984/bcstx',True)
+    view = db.paged_view('user/and_tweets',include_docs=True)
+    for k,g in itertools.groupby(view, lambda r:r['key'][0]):
+        user_d = g.next()
+        if user_d['id'][0] != 'U':
+            print "fail %r"%user_d
+            continue
+        user = User(user_d['doc'])
+        print "scoring %s - %s"%(user._id, user.screen_name)
+        tweets = [Tweet(r['doc']) for r in g]
+        if user.local_prob != 1.0:
+            continue
+        try:
+            rels = Relationships.get_for_user_id(user._id)
+        except ResourceNotFound:
+            print "rels not found"
+            rels = None
+        proc.score_new_users(user, rels, tweets)
+    print "done"
 
 def make_jeff_db():
     """Make a subset of 1% of the database - user docs and tweets for users

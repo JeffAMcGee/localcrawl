@@ -29,7 +29,8 @@ class LookupMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"lookup")
         self.scores = Scores()
-        self.scores.read(settings.lookup_in)
+        if settings.lookup_in:
+            self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
         self.halt = False
 
@@ -63,7 +64,7 @@ class LookupMaster(LocalProc):
         stop = 10000000 if self.halt else 100000
         for x in xrange(stop):
             try:
-                job = self.stalk.reserve(600)
+                job = self.stalk.reserve(120)
                 if job is None:
                     logging.info("loaded %d scores",x)
                     return

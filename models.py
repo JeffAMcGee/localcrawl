@@ -125,8 +125,7 @@ class Relationships(TwitterModel):
     
     @classmethod
     def get_for_user_id(cls, _id):
-        _id[0] = 'R'
-        return cls.get_id(_id)
+        return cls.get_id('R'+_id[1:])
 
     def rfriends(self):
         #figure out whether the user has more friends or followers
