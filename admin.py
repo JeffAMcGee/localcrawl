@@ -123,8 +123,8 @@ def fake_lu_master():
 
 def fake_lu_slave():
     proc = lookup.LookupSlave('y')
-    Relationships.database = CouchDB('http://127.0.0.1:5984/bcstx',True)
-    view = db.paged_view('user/and_tweets',include_docs=True)
+    Relationships.database = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
+    view = db.paged_view('dev/user_and_tweets',include_docs=True)
     for k,g in itertools.groupby(view, lambda r:r['key'][0]):
         user_d = g.next()
         if user_d['id'][0] != 'U':

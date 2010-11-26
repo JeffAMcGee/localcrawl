@@ -22,7 +22,7 @@ import scoredict
 
 
 RFRIEND_POINTS = 1000
-MENTION_POINTS = 1000
+MENTION_POINTS = 10
 
 
 class LookupMaster(LocalProc):
@@ -217,9 +217,9 @@ class LookupSlave(LocalProc):
             for tweet in tweets:
                 for uid in tweet.mentions:
                     ats[uid]+=1
-            at_count = sum(ats.values())
+            #at_count = sum(ats.values())
             for u,c in ats.iteritems():
-                points = c*MENTION_POINTS/at_count
+                points = c*MENTION_POINTS
                 if points >0:
                     jobs[u].mention_score = points
 
