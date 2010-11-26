@@ -221,7 +221,7 @@ def analyze():
             for loc in locs))
         for score in xrange(BUCKETS))
     
-    user_db = CouchDB('http://127.0.0.1:5984/bcstx',True)
+    user_db = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
     for int_id in scores:
         state, rfs, ats = scores.split(int_id)
         uid = as_local_id('U',int_id)
@@ -238,15 +238,12 @@ def analyze():
             score = log_score(rfs,ats,weight)
             counts[score][loc][weight]+=1
 
-    print "\ttodo\t\t\tnon\t\t\tunk\t\t\tlocal"
+    print "todo\t\t\t\t\tnon\t\t\t\t\tunk\t\t\t\t\tlocal"
     for score in xrange(BUCKETS):
-        print score,
         for loc in locs:
             for weight in weights:
-                print "\t%d"%counts[score][loc][weight],
-        print "\t%d"%sum(
-            counts[score][loc][settings.mention_weight]
-            for loc in locs)
+                print "%d\t"%counts[score][loc][weight],
+        print
 
 
 def force_lookup():
