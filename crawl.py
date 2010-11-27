@@ -76,7 +76,7 @@ class CrawlMaster(LocalProc):
 class CrawlSlave(LocalProc):
     def __init__(self, slave_id, todo, done):
         LocalProc.__init__(self,'crawl', slave_id)
-        self.res = TwitterResource()
+        self.twitter = TwitterResource()
         self.todo = todo
         self.done = done
 
@@ -89,8 +89,8 @@ class CrawlSlave(LocalProc):
                 self.crawl(user)
                 self.done.put(uid)
                 self.todo.task_done()
-                if self.res.remaining < 10:
-                    dt = (self.res.reset_time-datetime.utcnow())
+                if self.twitter.remaining < 10:
+                    dt = (self.twitter.reset_time-datetime.utcnow())
                     logging.info("goodnight for %r",dt)
                     time.sleep(dt.seconds)
             except Exception as ex:
@@ -98,52 +98,18 @@ class CrawlSlave(LocalProc):
                     logging.exception("exception for user %s"%user.to_d())
                 else:
                     logging.exception("exception and user is None")
-            logging.info("api calls remaining: %d",self.res.remaining)
+            logging.info("api calls remaining: %d",self.twitter.remaining)
         print "slave is done"
 
     def crawl(self, user):
-        since_id = as_int_id(user.last_tid)-1
         logging.debug("visiting %s - %s",user._id,user.screen_name)
-
-        count = 0
-        max_id = None
-        last_tid = None
-        while since_id != max_id:
-            try:
-                tweets = self.res.user_timeline(
-                    user._id,
-                    max_id = max_id,
-                    since_id = since_id,
-                )
-            except Unauthorized:
-                logging.warn("unauthorized!")
-                break
-            if not tweets:
-                logging.warn("no tweets found after %d for %s",count,user._id)
-                break
-            if not last_tid:
-                last_tid = tweets[0]._id
-            count+=len(tweets)
-            max_id =as_int_id(tweets[-1]._id)-1
-            for tweet in tweets:
-                if as_int_id(tweet._id)-1>since_id:
-                    #FIXME: replace with save??
-                    tweet.attempt_save()
-            if len(tweets)<175:
-                #there are no more tweets, and since_id+1 was deleted
-                break
-            if count>=3100:
-                logging.error("hit max tweets after %d for %s",count,user._id)
-                break
-        self.update(user,count,last_tid)
-
-    def update(self,user,count,last_tid):
-        if last_tid:
-            user.last_tid = last_tid
+        tweets = self.twitter.save_timeline(user._id, user.last_tid)
+        if tweets:
+            user.last_tid = tweets[0]._id
         now = datetime.utcnow()
         delta = now - user.last_crawl_date
         seconds = delta.seconds + delta.days*24*3600
-        tph = (3600.0*count/seconds + user.tweets_per_hour)/2
+        tph = (3600.0*len(tweets)/seconds + user.tweets_per_hour)/2
         user.tweets_per_hour = tph
         hours = min(settings.tweets_per_crawl/tph, settings.max_hours)
         user.next_crawl_date = now+timedelta(hours=hours)

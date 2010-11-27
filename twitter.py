@@ -103,3 +103,34 @@ class TwitterResource(Resource):
             **kwargs
         )
         return [Tweet(t) for t in timeline]
+
+    def save_timeline(self, uid, last_tid):
+        since_id = as_int_id(last_tid)-1
+
+        all_tweets = []
+        max_id = None
+        while since_id != max_id:
+            try:
+                tweets = self.user_timeline(
+                    uid,
+                    max_id = max_id,
+                    since_id = since_id,
+                )
+            except Unauthorized:
+                logging.warn("unauthorized!")
+                break
+            if not tweets:
+                logging.warn("no tweets found after %d for %s",len(all_tweets),uid)
+                break
+            if len(tweets)<175:
+                #there are no more tweets, and since_id+1 was deleted
+                break
+            all_tweets+=tweets
+            max_id =as_int_id(tweets[-1]._id)-1
+            if len(all_tweets)>=3100:
+                logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
+                break
+        for tweet in all_tweets:
+            if as_int_id(tweet._id)-1>since_id:
+                tweet.attempt_save()
+        return all_tweets
