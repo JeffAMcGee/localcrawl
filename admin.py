@@ -91,6 +91,15 @@ def export_gz(path):
         print >>f,json.dumps(d['doc'])
     f.close()
 
+def set_latest_from_view(path="mmt.json"):
+    for row in db.view('user/latest',group=True):
+        try:
+            user = User.get_id(row['key'])
+            user.last_tid = row['value'][0]
+            user.last_crawl_date = dt(2010,11,12)
+            user.save()
+        except ResourceNotFound:
+            pass
 
 def set_latest(path="mmt.json"):
     """Fill in last_tid based on the latest view. This

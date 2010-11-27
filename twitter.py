@@ -128,7 +128,7 @@ class TwitterResource(Resource):
             all_tweets+=tweets
             max_id =as_int_id(tweets[-1]._id)-1
             if len(all_tweets)>=3100:
-                logging.error("hit max tweets after %d for %s",len(all_tweets,uid)
+                logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
                 break
         for tweet in all_tweets:
             if as_int_id(tweet._id)-1>since_id:

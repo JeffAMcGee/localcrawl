@@ -39,8 +39,9 @@ class LookupMaster(LocalProc):
         logging.info("started lookup")
         try:
             while not self.halt:
-                if self.should_pick():
-                    logging.info("calc_cutoff")
+                ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
+                logging.info("ready is %d",ready)
+                if ready<1000:
                     cutoff = self.calc_cutoff()
 
                     if cutoff==0:
@@ -119,11 +120,6 @@ class LookupMaster(LocalProc):
                 self.scores.set_state(uid, scoredict.LOOKUP)
                 self.lookups+=1
 
-    def should_pick(self):
-        ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
-        logging.info("ready is %d",ready)
-        return ready < settings.crawl_ratio*(len(self.scores)-self.lookups)
-
 
 class LookupSlave(LocalProc):
     def __init__(self,slave_id):
@@ -157,7 +153,6 @@ class LookupSlave(LocalProc):
             users =self.twitter.user_lookup([b._id for b in bodies])
 
             logging.info("looking at %r"%[u.screen_name for u in users])
-            #get user_ids from beanstalk
             for job,body,user in zip(jobs,bodies,users):
                 try:
                     if self.twitter.remaining < 30:
@@ -217,7 +212,6 @@ class LookupSlave(LocalProc):
             for tweet in tweets:
                 for uid in tweet.mentions:
                     ats[uid]+=1
-            #at_count = sum(ats.values())
             for u,c in ats.iteritems():
                 points = c*MENTION_POINTS
                 if points >0:
