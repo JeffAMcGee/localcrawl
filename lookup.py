@@ -33,6 +33,7 @@ class LookupMaster(LocalProc):
             self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
         self.halt = False
+        self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def run(self):
         print "starting lookup"
@@ -165,7 +166,7 @@ class LookupSlave(LocalProc):
                         logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
                     logging.info("look at %s",user.screen_name)
-                    if user._id in User.database:
+                    if user._id in User.database or user._id in self.orig_db:
                         job.delete()
                         continue
                     self.crawl_user(user)
