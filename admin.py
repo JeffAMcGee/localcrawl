@@ -36,11 +36,6 @@ try:
 except:
     pass
 
-def connect(name):
-    "connect to the couchdb database on localhost named name"
-    Model.database = CouchDB('http://127.0.0.1:5984/'+name,True)
-    return Model.database
-
 
 def design_sync():
     "sync the documents in _design"
@@ -143,6 +138,7 @@ def fake_lu_slave():
         proc.score_new_users(user, rels, tweets)
     print "done"
 
+
 def make_jeff_db():
     """Make a subset of 1% of the database - user docs and tweets for users
     whose user_id ends in 58 (i.e. @JeffAMcGee)"""
@@ -152,38 +148,6 @@ def make_jeff_db():
             jeff.save_doc(row['doc'])
 
 
-def copy_locals():
-    scores = Scores()
-    scores.read(settings.lookup_out)
-    User.database = CouchDB('http://127.0.0.1:5984/hou',True)
-    for user in (User(d['doc']) for d in all_users()):
-        if user.local_prob==1:
-            if strictly_local(user.location):
-                state, rfs, ats = scores.split(as_int_id(user._id))
-                user.rfriends_score = rfs
-                user.mention_score = ats
-                user.save()
-            else:
-                print "ignoring '%s'"%user.location
-
-
-def copy_tweets(input='hou_ids',dbname='hou'):
-    out_db = CouchDB('http://127.0.0.1:5984/'+dbname,True)
-    locals = set(l.strip() for l in open(input))
-    for t in all_tweets():
-        if as_int_id(t['id'])>27882000000 and t['doc']['uid'] in locals:
-            del t['doc']['_rev']
-            out_db.save_doc(t['doc'])
-    
-
-
-def strictly_local(loc):
-    place = gisgraphy.twitter_loc(loc,True)
-    if place.name=='Sugar Land':
-        if 'sugar' not in loc.lower():
-            return False
-    return gisgraphy.in_local_box(place.to_d())
-
 def grouper(n, iterable, fillvalue=None):
     "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
@@ -191,6 +155,7 @@ def grouper(n, iterable, fillvalue=None):
 
 
 def count_sn(path):
+    "used to evaluate the results of localcrawl"
     lost =0
     found =0
     sns = (sn.strip() for sn in open(path))
@@ -274,61 +239,6 @@ def mkdir_p(path):
     except OSError as ex:
         if ex.errno!=errno.EEXIST:
             raise
-
-
-def baseN(num,b=36,numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
-    return baseN(num//b, b, numerals).lstrip("0")+numerals[num%b] if num else "0"
-
-
-def random_docs(count=100000):
-    from couchdbkit import Database
-    order = Database('http://127.0.0.1:5984/order',True)
-    for _id in xrange(count):
-        order.save_doc({'_id':str(_id)})
-    rand = Database('http://127.0.0.1:5984/rand',True)
-    for _id in sorted(xrange(count), key=lambda x:x%3):
-        rand.save_doc({'_id':str(_id)})
-
-def bulk_test():
-    from couchdbkit import Database
-    db = Database('http://127.0.0.1:5984/bulk',True)
-    for x in xrange(100):
-        docs = [ {'_id':str(x*1000+y)} for y in xrange(1000)]
-        db.bulk_save(docs)
-
- 
-def random_tweets():
-    '''this creates test tweets for testing couchdb'''
-    lorem = (
-        'lorem ipsum dolor sit amet, consectetur adipiscing elit. curabitur id '+
-        'malesuada augue. etiam lobortis mauris nec enim pretium id luctus sed.'
-    )
-
-    rand = CouchDB('http://127.0.0.1:5984/rand',True)
-    seq = CouchDB('http://127.0.0.1:5984/seq',True)
-    flat = open('tweets.json','w')
-    ids = [i**3 for i in xrange(1000000)]
-    random.shuffle(ids)
-    counter = 0
-    for tid in ids:
-        t = Tweet(
-            mentions = ['U123456789','U1248163264'],
-            geo = (-95.123,25.367),
-            created_at = datetime.datetime.now(),
-            favorited = False,
-            text = lorem[0:random.randint(20,140)],
-            user_id = 'U106582358', #@Jeffamcgee
-        )
-        t.tweet_id=tid
-        seq.save(t)
-        t._id=tid
-        t.tweet_id=None
-        rand.save(t)
-        print >>flat,json.dumps(t.to_d())
-
-        counter+=1
-        if counter==520000:
-            return
 
 
 def min_max_tid(path):
