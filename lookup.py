@@ -128,13 +128,13 @@ class LookupMaster(LocalProc):
 class LookupSlave(LocalProc):
     def __init__(self,slave_id):
         LocalProc.__init__(self,'lookup',slave_id)
-        self.res = TwitterResource()
+        self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
 
     def _guess_location(self,user):
         if not user.location:
             return .5
-        place = self.gisgraphy.twitter_loc(user.location)
+        place = self.gisgraphy.twitter_loc(user.location,strict=True)
         if not place:
             return .5
         user.geonames_place = place
@@ -154,14 +154,14 @@ class LookupSlave(LocalProc):
                 jobs.append(j)
 
             bodies = [LookupJobBody.from_job(j) for j in jobs]
-            users =self.res.user_lookup([b._id for b in bodies])
+            users =self.twitter.user_lookup([b._id for b in bodies])
 
             logging.info("looking at %r"%[u.screen_name for u in users])
             #get user_ids from beanstalk
             for job,body,user in zip(jobs,bodies,users):
                 try:
-                    if self.res.remaining < 30:
-                        dt = (self.res.reset_time-datetime.utcnow())
+                    if self.twitter.remaining < 30:
+                        dt = (self.twitter.reset_time-datetime.utcnow())
                         logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
                     logging.info("look at %s",user.screen_name)
@@ -176,7 +176,7 @@ class LookupSlave(LocalProc):
                 except:
                     logging.exception("exception for job %s"%job.body)
                     job.bury()
-            logging.info("api calls remaining: %d",self.res.remaining)
+            logging.info("api calls remaining: %d",self.twitter.remaining)
 
     def crawl_user(self,user):
         user.local_prob = self._guess_location(user)
@@ -185,11 +185,11 @@ class LookupSlave(LocalProc):
         rels=None
         tweets=None
         if user.followers_count>0 and user.friends_count>0:
-            rels = self.res.get_relationships(user._id)
+            rels = self.twitter.get_relationships(user._id)
             rels.attempt_save()
 
         if user.statuses_count>0:
-            tweets = self.res.user_timeline(user._id)
+            tweets = self.twitter.user_timeline(user._id,since_id=settings.min_tweet_id)
             for tweet in tweets:
                 tweet.attempt_save()
         if tweets:
