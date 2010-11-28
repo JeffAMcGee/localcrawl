@@ -77,7 +77,12 @@ class TwitterResource(Resource):
             user_id=ids,
             **kwargs
         )
-        return [User(d) for d in lookup]
+        users = [User(d) for d in lookup]
+        if len(users)==len(user_ids):
+            return users
+        # Ick. Twitter just removes suspended users from the results.
+        d = dict((u._id,u) for u in users)
+        return [d.get(uid,None) for uid in user_ids]
 
     def friends_ids(self, user_id):
         return self.get_ids("friends/ids.json", user_id)
