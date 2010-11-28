@@ -37,6 +37,10 @@ except:
     pass
 
 
+def connect(name):
+    return CouchDB(settings.couchdb_root+name,True)
+
+
 def design_sync():
     "sync the documents in _design"
     loader = FileSystemDocsLoader('_design')
@@ -79,8 +83,13 @@ def count_locations(path='counts'):
 
 def import_gz(path):
     f = gzip.GzipFile(path)
-    for g in grouper(1000,f):
-        db.bulk_save(json.loads(l) for l in g if l)
+    for l in f:
+        try:
+            db.save_doc(json.loads(l))
+        except ResourceConflict:
+            print "conflict for %s"%(l.strip())
+    #for g in grouper(1000,f):
+        #db.bulk_save(json.loads(l) for l in g if l)
     f.close()
 
 
@@ -90,6 +99,7 @@ def export_gz(path):
         del d['doc']['_rev']
         print >>f,json.dumps(d['doc'])
     f.close()
+
 
 def set_latest_from_view(path="mmt.json"):
     for row in db.view('user/latest',group=True):
@@ -155,6 +165,25 @@ def make_jeff_db():
     for row in db.paged_view('user/and_tweets',include_docs=True):
         if row['key'][0][-2:] == '58':
             jeff.save_doc(row['doc'])
+
+
+def copy_locals(path='hou_ids',to_db='hou'):
+    User.database = connect(to_db)
+    f = open(path,'w')
+    for user in (User(d['doc']) for d in all_users()):
+        if user.local_prob==1:
+            user.save()
+            print >>f, user._id
+    f.close()
+
+
+def copy_tweets(path='hou_ids',dbname='hou'):
+    out_db = CouchDB('http://127.0.0.1:5984/'+dbname,True)
+    locals = set(l.strip() for l in open(path))
+    for t in all_tweets():
+        if as_int_id(t['id'])>27882000000 and t['doc']['uid'] in locals:
+            del t['doc']['_rev']
+            out_db.save_doc(t['doc'])
 
 
 def grouper(n, iterable, fillvalue=None):

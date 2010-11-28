@@ -153,7 +153,7 @@ class LookupSlave(LocalProc):
             bodies = [LookupJobBody.from_job(j) for j in jobs]
             users =self.twitter.user_lookup([b._id for b in bodies])
 
-            logging.info("looking at %r"%[u.screen_name for u in users])
+            logging.info("looking at %r"%[getattr(u,'screen_name','') for u in users])
             for job,body,user in zip(jobs,bodies,users):
                 if user is None: continue
                 try:
