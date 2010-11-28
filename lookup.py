@@ -33,7 +33,6 @@ class LookupMaster(LocalProc):
             self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
         self.halt = False
-        self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def run(self):
         print "starting lookup"
@@ -127,11 +126,12 @@ class LookupSlave(LocalProc):
         LocalProc.__init__(self,'lookup',slave_id)
         self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
+        self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def _guess_location(self,user):
         if not user.location:
             return .5
-        place = self.gisgraphy.twitter_loc(user.location,strict=True)
+        place = self.gisgraphy.twitter_loc(user.location)
         if not place:
             return .5
         user.geonames_place = place
@@ -155,6 +155,7 @@ class LookupSlave(LocalProc):
 
             logging.info("looking at %r"%[u.screen_name for u in users])
             for job,body,user in zip(jobs,bodies,users):
+                if user is None: continue
                 try:
                     if self.twitter.remaining < 30:
                         dt = (self.twitter.reset_time-datetime.utcnow())
@@ -165,8 +166,6 @@ class LookupSlave(LocalProc):
                         job.delete()
                         continue
                     self.crawl_user(user)
-                    user.rfriends_score = body.rfriends_score
-                    user.mention_score = body.mention_score
                     user.save()
                     job.delete()
                 except:

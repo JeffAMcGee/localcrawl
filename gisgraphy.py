@@ -45,7 +45,7 @@ class GisgraphyResource(Resource):
         results = self.fulltextsearch(q)
         # otherwise, return the first result
         for res in results:
-            if res.name=='Sugar Land' and 'sugar' not in q:
+            if res['name']=='Sugar Land' and 'sugar' not in q:
                 break
             return GeonamesPlace(res)
         # try splitting q in half
