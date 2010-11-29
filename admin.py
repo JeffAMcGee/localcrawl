@@ -215,7 +215,7 @@ def analyze():
     local_users = set(r['id'] for r in local_view)
 
     locs = (-1,0,.5,1)
-    weights =(0,.25,.5,.75,1)
+    weights =(.1,.3,.5,.7,.9)
     counts = dict(
         (score, dict(
             (loc, dict(
@@ -249,26 +249,28 @@ def analyze():
         print
 
 
-def force_lookup():
+def force_lookup(to_db="hou"):
     "Lookup users who were not included in the original crawl."
-    # FIXME: ratio of locals to non-locals taken from a spreadsheet - it
-    # should come from analyze()!
-    probs = [.02,.02,.03,.04,.08,.13,.22,.32,.47,.69,.67,.88,.83,1,1]
-    res = TwitterResource()
-    for user in (User(d['doc']) for d in all_users()):
-        if user.local_prob != 1:
-            score = log_score(user.rfriends_score, user.mention_score)
-            if( user.local_prob==.5
-                and score >= settings.force_cutoff
-                and not user.lookup_done
-            ):
-                user.tweets_per_hour = settings.tweets_per_hour
-                user.next_crawl_date = dt.utcnow()
-                user.lookup_done = True
-                for tweet in res.user_timeline(user._id):
-                    tweet.attempt_save()
-            user.local_prob = probs[score]
-            user.save()
+    users = (User(d['doc']) for d in all_users())
+    Model.database = connect(to_db)
+    scores = Scores()
+    scores.read(settings.lookup_out)
+    for user in users:
+        int_uid = as_int_id(user._id)
+        if user.protected or user.local_prob == 1 or int_uid not in scores:
+            continue
+        if user.local_prob==0 and user.geonames_place.name not in ("Texas","United States"):
+            continue
+        state, rfs, ats = scores.split(int_uid)
+        if log_score(rfs,ats) >= settings.non_local_cutoff:
+            tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
+            if not tweets: continue
+            user.last_tid = tweets[0]._id
+            user.last_crawl_date = dt.utcnow()
+            user.next_crawl_date = dt.utcnow()
+            user.tweets_per_hour = settings.tweets_per_hour
+            user.lookup_done = True
+            user.attempt_save()
 
 
 def mkdir_p(path):

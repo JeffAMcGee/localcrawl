@@ -13,8 +13,8 @@ from settings import settings
 # bit 14-27: rfriends_score
 # bit 28-29: state - NEW, LOOKUP, DONE, FAILED
 
-BUCKETS = 15
-MAX_SCORE = 1<<(BUCKETS-1)
+BUCKETS = 29
+MAX_SCORE = 1<<14
 STATE_FIELD = MAX_SCORE*MAX_SCORE
 NEW=0
 LOOKUP=1
@@ -23,13 +23,13 @@ FAILED=3
 
 
 def log_score(rfs, ats, weight=None):
-    "log2 of weighted avg of scores"
+    "log(weighted avg of scores,sqrt(2))"
     if weight is None:
         weight = settings.mention_weight
     avg = (1-weight)*rfs + weight*ats
     if avg<1:
         return 0
-    return int(log(avg,2))
+    return int(2*log(avg,2))
 
 
 class Scores(defaultdict):

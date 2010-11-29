@@ -189,9 +189,9 @@ class LookupSlave(LocalProc):
                 tweet.attempt_save()
         if tweets:
             user.next_crawl_date = datetime.utcnow()
+            user.last_crawl_date = datetime.utcnow()
             user.tweets_per_hour = settings.tweets_per_hour
             user.last_tid = tweets[0]._id
-            user.last_crawl = datetime.now()
         
         user.lookup_done = True
         if user.local_prob == 1.0:

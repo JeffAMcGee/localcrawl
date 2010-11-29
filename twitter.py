@@ -5,7 +5,7 @@ import json
 import time
 import logging
 from datetime import datetime
-from restkit.errors import RequestFailed
+from restkit.errors import RequestFailed, Unauthorized
 from settings import settings
 from models import Relationships, User, Tweet, as_local_id, as_int_id
 

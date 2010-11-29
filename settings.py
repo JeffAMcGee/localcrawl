@@ -16,7 +16,8 @@ settings = SettingsBunch(
     couchdb_root = 'http://localhost:5984/',
     mention_weight = .5,
     crawl_ratio = .1,
-    force_cutoff = 8,
+    non_local_cutoff = 8,
+    unknown_cutoff = 9,
     min_cutoff = 2,
     lookup_in = 'lookup.in',
     lookup_out = 'lookup.out',
@@ -26,7 +27,7 @@ settings = SettingsBunch(
     tweets_per_crawl = 20,
     max_hours = 100,
     pdb = pdb.set_trace,
-    min_tweet_id = 27882000000,
+    min_tweet_id = 'T27882000000',
 )
 
 try:
