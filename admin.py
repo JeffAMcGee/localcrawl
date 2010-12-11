@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This is a tool for testing and administrative tasks.  It is designed to
 # be %run in ipython.  If you import it from another module, you're doing
 # something wrong.
@@ -93,9 +94,9 @@ def import_gz(path):
     f.close()
 
 
-def export_gz(path):
+def export_gz(path,start=None,end=None):
     f = gzip.GzipFile(path,'w',1)
-    for d in db.paged_view('_all_docs',include_docs=True):
+    for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
         del d['doc']['_rev']
         print >>f,json.dumps(d['doc'])
     f.close()
@@ -249,9 +250,10 @@ def analyze():
         print
 
 
-def force_lookup(to_db="hou"):
+def force_lookup(to_db="hou",start='U',end='V'):
     "Lookup users who were not included in the original crawl."
-    users = (User(d['doc']) for d in all_users())
+    user_view = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
+    users = (User(d['doc']) for d in user_view)
     Model.database = connect(to_db)
     scores = Scores()
     scores.read(settings.lookup_out)
