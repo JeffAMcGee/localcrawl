@@ -5,7 +5,7 @@ import json
 import time
 import logging
 from datetime import datetime
-from restkit.errors import RequestFailed
+from restkit.errors import RequestFailed, Unauthorized
 from settings import settings
 from models import Relationships, User, Tweet, as_local_id, as_int_id
 
@@ -77,7 +77,12 @@ class TwitterResource(Resource):
             user_id=ids,
             **kwargs
         )
-        return [User(d) for d in lookup]
+        users = [User(d) for d in lookup]
+        if len(users)==len(user_ids):
+            return users
+        # Ick. Twitter just removes suspended users from the results.
+        d = dict((u._id,u) for u in users)
+        return [d.get(uid,None) for uid in user_ids]
 
     def friends_ids(self, user_id):
         return self.get_ids("friends/ids.json", user_id)
@@ -103,3 +108,34 @@ class TwitterResource(Resource):
             **kwargs
         )
         return [Tweet(t) for t in timeline]
+
+    def save_timeline(self, uid, last_tid):
+        since_id = as_int_id(last_tid)-1
+
+        all_tweets = []
+        max_id = None
+        while since_id != max_id:
+            try:
+                tweets = self.user_timeline(
+                    uid,
+                    max_id = max_id,
+                    since_id = since_id,
+                )
+            except Unauthorized:
+                logging.warn("unauthorized!")
+                break
+            if not tweets:
+                logging.warn("no tweets found after %d for %s",len(all_tweets),uid)
+                break
+            if len(tweets)<175:
+                #there are no more tweets, and since_id+1 was deleted
+                break
+            all_tweets+=tweets
+            max_id =as_int_id(tweets[-1]._id)-1
+            if len(all_tweets)>=3100:
+                logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
+                break
+        for tweet in all_tweets:
+            if as_int_id(tweet._id)-1>since_id:
+                tweet.attempt_save()
+        return all_tweets

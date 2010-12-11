@@ -22,14 +22,15 @@ import scoredict
 
 
 RFRIEND_POINTS = 1000
-MENTION_POINTS = 1000
+MENTION_POINTS = 10
 
 
 class LookupMaster(LocalProc):
     def __init__(self):
         LocalProc.__init__(self,"lookup")
         self.scores = Scores()
-        self.scores.read(settings.lookup_in)
+        if settings.lookup_in:
+            self.scores.read(settings.lookup_in)
         self.lookups = self.scores.count_lookups()
         self.halt = False
 
@@ -38,8 +39,9 @@ class LookupMaster(LocalProc):
         logging.info("started lookup")
         try:
             while not self.halt:
-                if self.should_pick():
-                    logging.info("calc_cutoff")
+                ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
+                logging.info("ready is %d",ready)
+                if ready<1000:
                     cutoff = self.calc_cutoff()
 
                     if cutoff==0:
@@ -63,7 +65,7 @@ class LookupMaster(LocalProc):
         stop = 10000000 if self.halt else 100000
         for x in xrange(stop):
             try:
-                job = self.stalk.reserve(600)
+                job = self.stalk.reserve(120)
                 if job is None:
                     logging.info("loaded %d scores",x)
                     return
@@ -118,17 +120,13 @@ class LookupMaster(LocalProc):
                 self.scores.set_state(uid, scoredict.LOOKUP)
                 self.lookups+=1
 
-    def should_pick(self):
-        ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
-        logging.info("ready is %d",ready)
-        return ready < settings.crawl_ratio*(len(self.scores)-self.lookups)
-
 
 class LookupSlave(LocalProc):
     def __init__(self,slave_id):
         LocalProc.__init__(self,'lookup',slave_id)
-        self.res = TwitterResource()
+        self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
+        self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def _guess_location(self,user):
         if not user.location:
@@ -153,29 +151,27 @@ class LookupSlave(LocalProc):
                 jobs.append(j)
 
             bodies = [LookupJobBody.from_job(j) for j in jobs]
-            users =self.res.user_lookup([b._id for b in bodies])
+            users =self.twitter.user_lookup([b._id for b in bodies])
 
-            logging.info("looking at %r"%[u.screen_name for u in users])
-            #get user_ids from beanstalk
+            logging.info("looking at %r"%[getattr(u,'screen_name','') for u in users])
             for job,body,user in zip(jobs,bodies,users):
+                if user is None: continue
                 try:
-                    if self.res.remaining < 30:
-                        dt = (self.res.reset_time-datetime.utcnow())
+                    if self.twitter.remaining < 30:
+                        dt = (self.twitter.reset_time-datetime.utcnow())
                         logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
                     logging.info("look at %s",user.screen_name)
-                    if user._id in User.database:
+                    if user._id in User.database or user._id in self.orig_db:
                         job.delete()
                         continue
                     self.crawl_user(user)
-                    user.rfriends_score = body.rfriends_score
-                    user.mention_score = body.mention_score
                     user.save()
                     job.delete()
                 except:
                     logging.exception("exception for job %s"%job.body)
                     job.bury()
-            logging.info("api calls remaining: %d",self.res.remaining)
+            logging.info("api calls remaining: %d",self.twitter.remaining)
 
     def crawl_user(self,user):
         user.local_prob = self._guess_location(user)
@@ -184,18 +180,18 @@ class LookupSlave(LocalProc):
         rels=None
         tweets=None
         if user.followers_count>0 and user.friends_count>0:
-            rels = self.res.get_relationships(user._id)
+            rels = self.twitter.get_relationships(user._id)
             rels.attempt_save()
 
         if user.statuses_count>0:
-            tweets = self.res.user_timeline(user._id)
+            tweets = self.twitter.user_timeline(user._id,since_id=settings.min_tweet_id)
             for tweet in tweets:
                 tweet.attempt_save()
         if tweets:
             user.next_crawl_date = datetime.utcnow()
+            user.last_crawl_date = datetime.utcnow()
             user.tweets_per_hour = settings.tweets_per_hour
             user.last_tid = tweets[0]._id
-            user.last_crawl = datetime.now()
         
         user.lookup_done = True
         if user.local_prob == 1.0:
@@ -216,9 +212,8 @@ class LookupSlave(LocalProc):
             for tweet in tweets:
                 for uid in tweet.mentions:
                     ats[uid]+=1
-            at_count = sum(ats.values())
             for u,c in ats.iteritems():
-                points = c*MENTION_POINTS/at_count
+                points = c*MENTION_POINTS
                 if points >0:
                     jobs[u].mention_score = points
 
