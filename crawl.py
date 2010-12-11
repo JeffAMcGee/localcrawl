@@ -44,7 +44,7 @@ class CrawlMaster(LocalProc):
             while not HALT:
                 self.queue_crawl()
                 print "naptime"
-                time.sleep(15)
+                time.sleep(600)
         except:
             logging.exception("exception caused HALT")
         print "done"
