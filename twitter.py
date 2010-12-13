@@ -127,10 +127,10 @@ class TwitterResource(Resource):
             if not tweets:
                 logging.warn("no tweets found after %d for %s",len(all_tweets),uid)
                 break
+            all_tweets+=tweets
             if len(tweets)<175:
                 #there are no more tweets, and since_id+1 was deleted
                 break
-            all_tweets+=tweets
             max_id =as_int_id(tweets[-1]._id)-1
             if len(all_tweets)>=3100:
                 logging.error("hit max tweets after %d for %s",len(all_tweets),uid)

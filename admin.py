@@ -212,7 +212,8 @@ def analyze():
     "Find out how the scoring algorithm did."
     scores = Scores()
     scores.read(settings.lookup_out)
-    local_view = db.paged_view('_all_docs',startkey='U',endkey='V')
+    local_db = CouchDB('http://127.0.0.1:5984/hou',True)
+    local_view = local_db.paged_view('_all_docs',startkey='U',endkey='V')
     local_users = set(r['id'] for r in local_view)
 
     locs = (-1,0,.5,1)
@@ -225,16 +226,16 @@ def analyze():
             for loc in locs))
         for score in xrange(BUCKETS))
     
-    user_db = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
-    for int_id in scores:
-        state, rfs, ats = scores.split(int_id)
-        uid = as_local_id('U',int_id)
-        if uid in local_users:
+
+    for user in all_users():
+        if user['doc'].get('utco')!=-21600:
+            continue
+        state, rfs, ats = scores.split(as_int_id(user['id']))
+        if user['id'] in local_users:
             loc = 1
         else:
             try:
-                user = user_db.get(uid)
-                loc = .5 if user['prob']==.5 else 0
+                loc = .5 if user['doc']['prob']==.5 else 0
             except ResourceNotFound:
                 loc = -1
 
@@ -259,21 +260,30 @@ def force_lookup(to_db="hou",start='U',end='V'):
     scores.read(settings.lookup_out)
     for user in users:
         int_uid = as_int_id(user._id)
-        if user.protected or user.local_prob == 1 or int_uid not in scores:
-            continue
+        if user.lookup_done or user.protected: continue
+        if user.local_prob == 1 or int_uid not in scores: continue
         if user.local_prob==0 and user.geonames_place.name not in ("Texas","United States"):
             continue
         state, rfs, ats = scores.split(int_uid)
-        if log_score(rfs,ats) >= settings.non_local_cutoff:
-            tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
-            if not tweets: continue
-            user.last_tid = tweets[0]._id
-            user.last_crawl_date = dt.utcnow()
-            user.next_crawl_date = dt.utcnow()
-            user.tweets_per_hour = settings.tweets_per_hour
-            user.lookup_done = True
-            user.attempt_save()
+        if user.utc_offset == -21600:
+            if log_score(rfs,ats,.9) < 1: continue
+        else:
+            if log_score(rfs,ats) < settings.non_local_cutoff: continue
+        tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
+        if not tweets: continue
+        user.last_tid = tweets[0]._id
+        user.last_crawl_date = dt.utcnow()
+        user.next_crawl_date = dt.utcnow()
+        user.tweets_per_hour = settings.tweets_per_hour
+        user.lookup_done = True
+        user.attempt_save()
 
+        logging.info("api calls remaining: %d",res.remaining)
+        if res.remaining < 10:
+            delta = (res.reset_time-dt.utcnow())
+            logging.info("goodnight for %r",delta)
+            time.sleep(delta.seconds)
+ 
 
 def mkdir_p(path):
     try:
