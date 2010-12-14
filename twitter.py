@@ -109,11 +109,10 @@ class TwitterResource(Resource):
         )
         return [Tweet(t) for t in timeline]
 
-    def save_timeline(self, uid, last_tid):
+    def save_timeline(self, uid, last_tid, max_id=None):
         since_id = as_int_id(last_tid)-1
 
         all_tweets = []
-        max_id = None
         while since_id != max_id:
             try:
                 tweets = self.user_timeline(
