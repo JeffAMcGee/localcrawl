@@ -10,6 +10,7 @@ import os,errno
 import logging
 import random
 import gzip
+import heapq
 import sys
 from collections import defaultdict
 from datetime import datetime as dt
@@ -102,6 +103,24 @@ def export_gz(path,start=None,end=None):
     f.close()
 
 
+def merge_db():
+    names = (
+        "foo","bar",
+        #"hou_f1","hou_f1b","hou_f2","hou_f2b","hou_f3","hou_f4",
+        #"hou_f5","hou_f6","hou_f7","hou_f8","hou_f9","hou_lu",
+    )
+    views = [
+        connect(name).paged_view('_all_docs',include_docs=True)
+        for name in names
+    ]
+    last =None
+    for row in merge_views(*views):
+        if row['key']!=last:
+            del row['doc']['_rev']
+            print json.dumps(row['doc'])
+            last = row['key']
+
+
 def set_latest_from_view(path="mmt.json"):
     for row in db.view('user/latest',group=True):
         try:
@@ -191,6 +210,32 @@ def grouper(n, iterable, fillvalue=None):
     "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
     return itertools.izip_longest(*args, fillvalue=fillvalue)
+
+
+def merge_views(*views):
+    # This is based on heapq.merge in python 2.6.  The big difference is
+    # that it sorts by key.
+    h = []
+    for itnum, it in enumerate(map(iter, views)):
+        try:
+            row = it.next()
+            h.append([row['key'], itnum, row, it.next])
+        except StopIteration:
+            pass
+    heapq.heapify(h)
+
+    while 1:
+        try:
+            while 1:
+                k, itnum, v, next = s = h[0]   # raises IndexError when h is empty
+                yield v
+                s[2] = next()               # raises StopIteration when exhausted
+                s[0] = s[2]['key']
+                heapq.heapreplace(h, s)          # restore heap condition
+        except StopIteration:
+            heapq.heappop(h)                     # remove empty iterator
+        except IndexError:
+            return
 
 
 def count_sn(path):
