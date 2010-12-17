@@ -283,6 +283,25 @@ def force_lookup(to_db="hou",start='U',end='V'):
             delta = (res.reset_time-dt.utcnow())
             logging.info("goodnight for %r",delta)
             time.sleep(delta.seconds)
+
+def fill_800(start='U',end='V'):
+    view = db.paged_view('once/near_800',
+        startkey=start,
+        endkey=end,
+        group=True,
+    )
+    old_min = 27882000000L
+    settings.pdb()
+    for row in view:
+        fore,aft = row['value']
+        if aft==None and fore<old_min:
+            continue
+        tweets = res.save_timeline(
+            row['key'],
+            last_tid=as_local_id('T',fore if fore else old_min),
+            max_id=as_local_id('T',aft) if aft else None,
+        )
+        logging.info("saved %d for %s",len(tweets),row['key'])
  
 
 def mkdir_p(path):
