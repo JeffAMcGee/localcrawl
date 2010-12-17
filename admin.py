@@ -82,24 +82,20 @@ def count_locations(path='counts'):
     f.close()
 
 
-def import_gz(path):
-    f = gzip.GzipFile(path)
-    for l in f:
-        try:
-            db.save_doc(json.loads(l))
-        except ResourceConflict:
-            print "conflict for %s"%(l.strip())
-    #for g in grouper(1000,f):
-        #db.bulk_save(json.loads(l) for l in g if l)
-    f.close()
+def import_json():
+    #for l in f:
+    #    try:
+    #        db.save_doc(json.loads(l))
+    #    except ResourceConflict:
+    #        print "conflict for %s"%(l.strip())
+    for g in grouper(1000,sys.stdin):
+        db.bulk_save(json.loads(l) for l in g if l)
 
 
-def export_gz(path,start=None,end=None):
-    f = gzip.GzipFile(path,'w',1)
+def export_json(start=None,end=None):
     for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
         del d['doc']['_rev']
-        print >>f,json.dumps(d['doc'])
-    f.close()
+        print json.dumps(d['doc'])
 
 
 def set_latest_from_view(path="mmt.json"):
@@ -285,20 +281,26 @@ def force_lookup(to_db="hou",start='U',end='V'):
             time.sleep(delta.seconds)
 
 def fill_800(start='U',end='V'):
+    users = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
+    settings.pdb()
+    unknown = set(u['id'] for u in users if u['doc']['prob']!=1)
+    print "done making unknown set"
     view = db.paged_view('once/near_800',
         startkey=start,
         endkey=end,
         group=True,
     )
-    old_min = 27882000000L
+    #old_min = 27882000000L
     settings.pdb()
     for row in view:
         fore,aft = row['value']
-        if aft==None and fore<old_min:
+        if aft==None:
+            continue
+        if row['key'] not in unknown:
             continue
         tweets = res.save_timeline(
             row['key'],
-            last_tid=as_local_id('T',fore if fore else old_min),
+            last_tid=settings.min_tweet_id,#as_local_id('T',fore if fore else old_min),
             max_id=as_local_id('T',aft) if aft else None,
         )
         logging.info("saved %d for %s",len(tweets),row['key'])
