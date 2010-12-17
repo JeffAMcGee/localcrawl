@@ -334,5 +334,8 @@ def krishna_export(start=[2010],end=None):
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
 
 if __name__ == '__main__':
+    if os.environ.get('COUCH'):
+        db = connect(os.environ['COUCH'])
+        Model.database = db
     if len(sys.argv)>1:
         locals()[sys.argv[1]](*sys.argv[2:])
