@@ -167,6 +167,18 @@ def make_jeff_db():
             jeff.save_doc(row['doc'])
 
 
+def count_recent():
+    min_int_id = 8000000000000000L
+    view = db.paged_view('user/and_tweets')
+    for k,g in itertools.groupby(view, lambda r:r['key'][0]):
+            user_d = g.next()
+            if user_d['id'][0] != 'U':
+                print "fail %r"%user_d
+                continue
+            tweets = sum(1 for r in g if as_int_id(r['id'])>min_int_id)
+            print "%d\t%s"%(tweets,user_d['id'])
+         
+
 def copy_locals(path='hou_ids',to_db='hou'):
     User.database = connect(to_db)
     f = open(path,'w')
