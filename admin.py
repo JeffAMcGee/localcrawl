@@ -101,9 +101,8 @@ def export_json(start=None,end=None):
 
 def merge_db():
     names = (
-        "foo","bar",
-        #"hou_f1","hou_f1b","hou_f2","hou_f2b","hou_f3","hou_f4",
-        #"hou_f5","hou_f6","hou_f7","hou_f8","hou_f9","hou_lu",
+        "hou_f1","hou_f1b","hou_f2","hou_f2b","hou_f3","hou_f4",
+        "hou_f5","hou_f6","hou_f7","hou_f8","hou_f9","hou_lu",
     )
     views = [
         connect(name).paged_view('_all_docs',include_docs=True)
@@ -292,8 +291,10 @@ def analyze():
         print
 
 
-def force_lookup(to_db="hou",start='U',end='V'):
+def force_lookup(to_db="hou",start_id='',end_id=None):
     "Lookup users who were not included in the original crawl."
+    start ='U'+start_id
+    end = 'U'+end_id if end_id else 'V'
     user_view = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
     users = (User(d['doc']) for d in user_view)
     Model.database = connect(to_db)
@@ -301,15 +302,13 @@ def force_lookup(to_db="hou",start='U',end='V'):
     scores.read(settings.lookup_out)
     for user in users:
         int_uid = as_int_id(user._id)
-        if user.lookup_done or user.protected: continue
-        if user.local_prob == 1 or int_uid not in scores: continue
-        if user.local_prob==0 and user.geonames_place.name not in ("Texas","United States"):
+        if user.lookup_done or user.protected or int_uid not in scores: continue
+        if user.local_prob!=0 or user.geonames_place.name in ("Texas","United States"):
             continue
         state, rfs, ats = scores.split(int_uid)
-        if user.utc_offset == -21600:
-            if log_score(rfs,ats,.9) < 1: continue
-        else:
-            if log_score(rfs,ats) < settings.non_local_cutoff: continue
+        #FIXME: this is a one-off thing to get the highly-connected non-locals
+        if user.utc_offset != -21600 or log_score(rfs,ats) < settings.non_local_cutoff:
+            continue
         tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
         if not tweets: continue
         user.last_tid = tweets[0]._id
@@ -318,25 +317,35 @@ def force_lookup(to_db="hou",start='U',end='V'):
         user.tweets_per_hour = settings.tweets_per_hour
         user.lookup_done = True
         user.attempt_save()
+        logging.info("saved %d from %s to %s",len(tweets),tweets[-1]._id,tweets[0]._id)
+        sleep_if_needed()
 
-        logging.info("api calls remaining: %d",res.remaining)
-        if res.remaining < 10:
-            delta = (res.reset_time-dt.utcnow())
-            logging.info("goodnight for %r",delta)
-            time.sleep(delta.seconds)
 
-def fill_800(start='U',end='V'):
+def sleep_if_needed():
+    logging.info("api calls remaining: %d",res.remaining)
+    if res.remaining < 10:
+        delta = (res.reset_time-dt.utcnow())
+        logging.info("goodnight for %r",delta)
+        time.sleep(delta.seconds)
+
+
+def fix_doc_type():
+    for t in db.view('fix/doc_type',include_docs=True):
+        t['doc']['doc_type']='Tweet'
+        db.save_doc(t['doc'])
+
+
+def fill_800(start='U',end='U2'):
     users = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
-    settings.pdb()
     unknown = set(u['id'] for u in users if u['doc']['prob']!=1)
     print "done making unknown set"
     view = db.paged_view('once/near_800',
         startkey=start,
         endkey=end,
         group=True,
+        stale="ok",
     )
-    #old_min = 27882000000L
-    settings.pdb()
+    count = 0
     for row in view:
         fore,aft = row['value']
         if aft==None:
@@ -345,10 +354,13 @@ def fill_800(start='U',end='V'):
             continue
         tweets = res.save_timeline(
             row['key'],
-            last_tid=settings.min_tweet_id,#as_local_id('T',fore if fore else old_min),
-            max_id=as_local_id('T',aft) if aft else None,
+            last_tid=settings.min_tweet_id,
+            max_tid=as_local_id('T',aft) if aft else None,
         )
         logging.info("saved %d for %s",len(tweets),row['key'])
+        count = 0 if tweets else count+1
+        if count==100: return
+        sleep_if_needed()
  
 
 def mkdir_p(path):
