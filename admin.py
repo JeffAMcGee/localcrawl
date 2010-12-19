@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This is a tool for testing and administrative tasks.  It is designed to
 # be %run in ipython.  If you import it from another module, you're doing
 # something wrong.
@@ -9,6 +10,7 @@ import os,errno
 import logging
 import random
 import gzip
+import heapq
 import sys
 from collections import defaultdict
 from datetime import datetime as dt
@@ -81,24 +83,37 @@ def count_locations(path='counts'):
     f.close()
 
 
-def import_gz(path):
-    f = gzip.GzipFile(path)
-    for l in f:
-        try:
-            db.save_doc(json.loads(l))
-        except ResourceConflict:
-            print "conflict for %s"%(l.strip())
-    #for g in grouper(1000,f):
-        #db.bulk_save(json.loads(l) for l in g if l)
-    f.close()
+def import_json():
+    #for l in f:
+    #    try:
+    #        db.save_doc(json.loads(l))
+    #    except ResourceConflict:
+    #        print "conflict for %s"%(l.strip())
+    for g in grouper(1000,sys.stdin):
+        db.bulk_save(json.loads(l) for l in g if l)
 
 
-def export_gz(path):
-    f = gzip.GzipFile(path,'w',1)
-    for d in db.paged_view('_all_docs',include_docs=True):
+def export_json(start=None,end=None):
+    for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
         del d['doc']['_rev']
-        print >>f,json.dumps(d['doc'])
-    f.close()
+        print json.dumps(d['doc'])
+
+
+def merge_db():
+    names = (
+        "hou_f1","hou_f1b","hou_f2","hou_f2b","hou_f3","hou_f4",
+        "hou_f5","hou_f6","hou_f7","hou_f8","hou_f9","hou_lu",
+    )
+    views = [
+        connect(name).paged_view('_all_docs',include_docs=True)
+        for name in names
+    ]
+    last =None
+    for row in merge_views(*views):
+        if row['key']!=last:
+            del row['doc']['_rev']
+            print json.dumps(row['doc'])
+            last = row['key']
 
 
 def set_latest_from_view(path="mmt.json"):
@@ -204,6 +219,32 @@ def grouper(n, iterable, fillvalue=None):
     return itertools.izip_longest(*args, fillvalue=fillvalue)
 
 
+def merge_views(*views):
+    # This is based on heapq.merge in python 2.6.  The big difference is
+    # that it sorts by key.
+    h = []
+    for itnum, it in enumerate(map(iter, views)):
+        try:
+            row = it.next()
+            h.append([row['key'], itnum, row, it.next])
+        except StopIteration:
+            pass
+    heapq.heapify(h)
+
+    while 1:
+        try:
+            while 1:
+                k, itnum, v, next = s = h[0]   # raises IndexError when h is empty
+                yield v
+                s[2] = next()               # raises StopIteration when exhausted
+                s[0] = s[2]['key']
+                heapq.heapreplace(h, s)          # restore heap condition
+        except StopIteration:
+            heapq.heappop(h)                     # remove empty iterator
+        except IndexError:
+            return
+
+
 def count_sn(path):
     "used to evaluate the results of localcrawl"
     lost =0
@@ -223,7 +264,8 @@ def analyze():
     "Find out how the scoring algorithm did."
     scores = Scores()
     scores.read(settings.lookup_out)
-    local_view = db.paged_view('_all_docs',startkey='U',endkey='V')
+    local_db = CouchDB('http://127.0.0.1:5984/hou',True)
+    local_view = local_db.paged_view('_all_docs',startkey='U',endkey='V')
     local_users = set(r['id'] for r in local_view)
 
     locs = (-1,0,.5,1)
@@ -236,16 +278,16 @@ def analyze():
             for loc in locs))
         for score in xrange(BUCKETS))
     
-    user_db = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
-    for int_id in scores:
-        state, rfs, ats = scores.split(int_id)
-        uid = as_local_id('U',int_id)
-        if uid in local_users:
+
+    for user in all_users():
+        if user['doc'].get('utco')!=-21600:
+            continue
+        state, rfs, ats = scores.split(as_int_id(user['id']))
+        if user['id'] in local_users:
             loc = 1
         else:
             try:
-                user = user_db.get(uid)
-                loc = .5 if user['prob']==.5 else 0
+                loc = .5 if user['doc']['prob']==.5 else 0
             except ResourceNotFound:
                 loc = -1
 
@@ -261,29 +303,77 @@ def analyze():
         print
 
 
-def force_lookup(to_db="hou"):
+def force_lookup(to_db="hou",start_id='',end_id=None):
     "Lookup users who were not included in the original crawl."
-    users = (User(d['doc']) for d in all_users())
+    start ='U'+start_id
+    end = 'U'+end_id if end_id else 'V'
+    user_view = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
+    users = (User(d['doc']) for d in user_view)
     Model.database = connect(to_db)
     scores = Scores()
     scores.read(settings.lookup_out)
     for user in users:
         int_uid = as_int_id(user._id)
-        if user.protected or user.local_prob == 1 or int_uid not in scores:
-            continue
-        if user.local_prob==0 and user.geonames_place.name not in ("Texas","United States"):
+        if user.lookup_done or user.protected or int_uid not in scores: continue
+        if user.local_prob!=0 or user.geonames_place.name in ("Texas","United States"):
             continue
         state, rfs, ats = scores.split(int_uid)
-        if log_score(rfs,ats) >= settings.non_local_cutoff:
-            tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
-            if not tweets: continue
-            user.last_tid = tweets[0]._id
-            user.last_crawl_date = dt.utcnow()
-            user.next_crawl_date = dt.utcnow()
-            user.tweets_per_hour = settings.tweets_per_hour
-            user.lookup_done = True
-            user.attempt_save()
+        #FIXME: this is a one-off thing to get the highly-connected non-locals
+        if user.utc_offset != -21600 or log_score(rfs,ats) < settings.non_local_cutoff:
+            continue
+        tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
+        if not tweets: continue
+        user.last_tid = tweets[0]._id
+        user.last_crawl_date = dt.utcnow()
+        user.next_crawl_date = dt.utcnow()
+        user.tweets_per_hour = settings.tweets_per_hour
+        user.lookup_done = True
+        user.attempt_save()
+        logging.info("saved %d from %s to %s",len(tweets),tweets[-1]._id,tweets[0]._id)
+        sleep_if_needed()
 
+
+def sleep_if_needed():
+    logging.info("api calls remaining: %d",res.remaining)
+    if res.remaining < 10:
+        delta = (res.reset_time-dt.utcnow())
+        logging.info("goodnight for %r",delta)
+        time.sleep(delta.seconds)
+
+
+def fix_doc_type():
+    for t in db.view('fix/doc_type',include_docs=True):
+        t['doc']['doc_type']='Tweet'
+        db.save_doc(t['doc'])
+
+
+def fill_800(start='U',end='U2'):
+    users = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
+    unknown = set(u['id'] for u in users if u['doc']['prob']!=1)
+    print "done making unknown set"
+    view = db.paged_view('once/near_800',
+        startkey=start,
+        endkey=end,
+        group=True,
+        stale="ok",
+    )
+    count = 0
+    for row in view:
+        fore,aft = row['value']
+        if aft==None:
+            continue
+        if row['key'] not in unknown:
+            continue
+        tweets = res.save_timeline(
+            row['key'],
+            last_tid=settings.min_tweet_id,
+            max_tid=as_local_id('T',aft) if aft else None,
+        )
+        logging.info("saved %d for %s",len(tweets),row['key'])
+        count = 0 if tweets else count+1
+        if count==100: return
+        sleep_if_needed()
+ 
 
 def mkdir_p(path):
     try:
@@ -334,5 +424,8 @@ def krishna_export(start=[2010],end=None):
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
 
 if __name__ == '__main__':
+    if os.environ.get('COUCH'):
+        db = connect(os.environ['COUCH'])
+        Model.database = db
     if len(sys.argv)>1:
         locals()[sys.argv[1]](*sys.argv[2:])
