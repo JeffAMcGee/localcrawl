@@ -71,15 +71,17 @@ class TwitterResource(Resource):
         )
         return (as_local_id('U',id) for id in ids)
 
-    def user_lookup(self, user_ids, **kwargs):
+    def user_lookup(self, user_ids, screen_names=None, **kwargs):
         ids = ','.join(str(as_int_id(u)) for u in user_ids)
+        names = ','.join(screen_names)
         lookup = self.get_d(
             "users/lookup.json",
+            screen_name=names,
             user_id=ids,
             **kwargs
         )
         users = [User(d) for d in lookup]
-        if len(users)==len(user_ids):
+        if len(users)==len(user_ids) or screen_names:
             return users
         # Ick. Twitter just removes suspended users from the results.
         d = dict((u._id,u) for u in users)

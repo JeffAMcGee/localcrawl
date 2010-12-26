@@ -238,8 +238,8 @@ def count_sn(path):
     lost =0
     found =0
     sns = (sn.strip() for sn in open(path))
-    for group in grouper(20,sns):
-        for user in res.user_lookup([], screen_name=','.join(group)):
+    for group in grouper(100,sns):
+        for user in res.user_lookup([], screen_names=group):
             if user._id in db:
                 found+=1
                 print "found %s - %s"%(user.screen_name,user._id)

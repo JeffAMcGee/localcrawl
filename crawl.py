@@ -81,6 +81,7 @@ class CrawlSlave(LocalProc):
         self.done = done
 
     def run(self):
+        Tweet.database = CouchDB(settings.couchdb_root+"hou_tweets",True)
         while not HALT:
             user=None
             try:
@@ -107,7 +108,8 @@ class CrawlSlave(LocalProc):
         if tweets:
             user.last_tid = tweets[0]._id
         now = datetime.utcnow()
-        delta = now - user.last_crawl_date
+        last = user.last_crawl_date if user.last_crawl_date is not None else datetime(2010,11,12)
+        delta = now - last
         seconds = delta.seconds + delta.days*24*3600
         tph = (3600.0*len(tweets)/seconds + user.tweets_per_hour)/2
         user.tweets_per_hour = tph
