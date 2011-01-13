@@ -12,11 +12,12 @@ import random
 import gzip
 import heapq
 import sys
+import getopt
 from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
 
-from couchdbkit import ResourceNotFound
+from couchdbkit import ResourceNotFound, BulkSaveError
 from couchdbkit.loaders import FileSystemDocsLoader
 import beanstalkc
 
@@ -83,15 +84,31 @@ def count_locations(path='counts'):
     f.close()
 
 
-def import_json():
-    #for l in f:
-    #    try:
-    #        db.save_doc(json.loads(l))
-    #    except ResourceConflict:
-    #        print "conflict for %s"%(l.strip())
-    for g in grouper(1000,sys.stdin):
-        db.bulk_save(json.loads(l) for l in g if l)
+def count_tweets_in_box(start='T',end='U'):
+    settings.pdb()
+    counts = defaultdict(int)
+    box = settings.local_box
+    for d in db.paged_view('tweet/plc',include_docs=True,startkey="null",startkey_docid=start,endkey_docid=end,stale="ok",page_size=2):
+        if 'coord' in d:
+            c = d['coord']['coordinates']
+            if box['lat'][0]<c[0]<box['lat'][1] and box['lng'][0]<c[1]<box['lng'][1]:
+                counts['inb']+=1
+            else:
+                counts['outb']+=1
+        else:
+            counts['noco']+=1
+    print dict(counts)
 
+
+def import_json():
+    for g in grouper(1000,sys.stdin):
+        try:
+            db.bulk_save(json.loads(l) for l in g if l)
+        except BulkSaveError as err:
+            if any(d['error']!='conflict' for d in err.errors):
+                raise
+            else:
+                logging.warn("conflicts for %r",[d['id'] for d in err.errors])
 
 def export_json(start=None,end=None):
     for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
@@ -99,13 +116,13 @@ def export_json(start=None,end=None):
         print json.dumps(d['doc'])
 
 
-def merge_db():
-    names = (
-        "hou_f1","hou_f1b","hou_f2","hou_f2b","hou_f3","hou_f4",
-        "hou_f5","hou_f6","hou_f7","hou_f8","hou_f9","hou_lu",
-    )
+def merge_db(*names,**kwargs):
     views = [
-        connect(name).paged_view('_all_docs',include_docs=True)
+        connect(name).paged_view(
+            '_all_docs',
+            include_docs=True,
+            startkey=kwargs.get('start'),
+            endkey=kwargs.get('end'))
         for name in names
     ]
     last =None
@@ -298,27 +315,48 @@ def force_lookup(to_db="hou",start_id='',end_id=None):
     user_view = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
     users = (User(d['doc']) for d in user_view)
     Model.database = connect(to_db)
+    found_db = connect("houtx")
+    found_view = found_db.paged_view('_all_docs',startkey=start,endkey=end)
+    found = set(d['id'] for d in found_view)
     scores = Scores()
     scores.read(settings.lookup_out)
+    region = ("Texas","United States")
     for user in users:
         int_uid = as_int_id(user._id)
-        if user.lookup_done or user.protected or int_uid not in scores: continue
-        if user.local_prob!=0 or user.geonames_place.name in ("Texas","United States"):
+        if (    user.lookup_done or
+                user.protected or
+                int_uid not in scores or
+                user.local_prob==1 or
+                (user.local_prob==0 and user.geonames_place.name not in region) or
+                user._id in found
+           ):
             continue
         state, rfs, ats = scores.split(int_uid)
-        #FIXME: this is a one-off thing to get the highly-connected non-locals
-        if user.utc_offset != -21600 or log_score(rfs,ats) < settings.non_local_cutoff:
-            continue
-        tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
-        if not tweets: continue
-        user.last_tid = tweets[0]._id
-        user.last_crawl_date = dt.utcnow()
-        user.next_crawl_date = dt.utcnow()
-        user.tweets_per_hour = settings.tweets_per_hour
-        user.lookup_done = True
-        user.attempt_save()
-        logging.info("saved %d from %s to %s",len(tweets),tweets[-1]._id,tweets[0]._id)
-        sleep_if_needed()
+        if user.utc_offset == -21600:
+            if log_score(rfs,ats,.9) < 1: continue
+        else:
+            if log_score(rfs,ats) < settings.non_local_cutoff: continue
+        user_lookup(user)
+
+
+def stdin_lookup():
+    from_db = connect("orig_houtx")
+    for l in sys.stdin:
+        user = from_db.get_id(User,l.strip())
+        user_lookup(user)
+
+
+def user_lookup(user):
+    tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
+    if not tweets: return
+    user.last_tid = tweets[0]._id
+    user.last_crawl_date = dt.utcnow()
+    user.next_crawl_date = dt.utcnow()
+    user.tweets_per_hour = settings.tweets_per_hour
+    user.lookup_done = True
+    user.attempt_save()
+    logging.info("saved %d from %s to %s",len(tweets),tweets[-1]._id,tweets[0]._id)
+    sleep_if_needed()
 
 
 def sleep_if_needed():
@@ -411,9 +449,22 @@ def krishna_export(start=[2010],end=None):
                 else:
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
 
-if __name__ == '__main__':
-    if os.environ.get('COUCH'):
-        db = connect(os.environ['COUCH'])
-        Model.database = db
-    if len(sys.argv)>1:
-        locals()[sys.argv[1]](*sys.argv[2:])
+if __name__ == '__main__' and len(sys.argv)>1:
+    try:
+        opts, args = getopt.getopt(sys.argv[2:], "c:s:e:")
+    except getopt.GetoptError, err:
+        print str(err)
+        print "usage: ./admin.py function_name [-c database] [-s startkey] [-e endkey] [arguments]"
+        sys.exit(2)
+    kwargs={}
+    for o, a in opts:
+        if o == "-c":
+            db = connect(a)
+            Model.database = db
+        elif o == "-s":
+            kwargs['start']=a
+        elif o == "-e":
+            kwargs['end']=a
+        else:
+            assert False, "unhandled option"
+    locals()[sys.argv[1]](*args,**kwargs)
