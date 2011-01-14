@@ -103,12 +103,24 @@ def count_tweets_in_box(start='T',end='U'):
 def import_json():
     for g in grouper(1000,sys.stdin):
         try:
-            db.bulk_save(json.loads(l) for l in g if l)
+            db.bulk_save([json.loads(l) for l in g if l])
         except BulkSaveError as err:
             if any(d['error']!='conflict' for d in err.errors):
                 raise
             else:
                 logging.warn("conflicts for %r",[d['id'] for d in err.errors])
+
+def import_old_json():
+    for g in grouper(1000,sys.stdin):
+        docs = [json.loads(l) for l in g if l]
+        for d in docs:
+            del d['doc_type']
+            for k,v in d.iteritems():
+                if k[-2:]=='id' or k in ('rtt','rtu'):
+                    d[k]=v[1:]
+            if 'ats' in d and isinstance(d['ats'],list):
+                d['ats'] = [u[1:] for u in d['ats']]
+        db.bulk_save(docs)
 
 def export_json(start=None,end=None):
     for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
