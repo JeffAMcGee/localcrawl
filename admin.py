@@ -118,9 +118,11 @@ def import_old_json():
             for k,v in d.iteritems():
                 if k[-2:]=='id' or k in ('rtt','rtu'):
                     d[k]=v[1:]
-            if 'ats' in d and isinstance(d['ats'],list):
-                d['ats'] = [u[1:] for u in d['ats']]
+            for field in ['ats','fols','frs']:
+                if field in d and isinstance(d[field],list):
+                    d[field] = [u[1:] for u in d[field]]
         db.bulk_save(docs)
+
 
 def export_json(start=None,end=None):
     for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
