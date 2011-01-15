@@ -44,9 +44,9 @@ def connect(name):
     return CouchDB(settings.couchdb_root+name,True)
 
 
-def design_sync():
+def design_sync(type):
     "sync the documents in _design"
-    loader = FileSystemDocsLoader('_design')
+    loader = FileSystemDocsLoader(type+'_design')
     loader.sync(db, verbose=True)
 
 
