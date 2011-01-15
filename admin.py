@@ -85,13 +85,20 @@ def count_locations(path='counts'):
 
 
 def count_tweets_in_box(start='T',end='U'):
-    settings.pdb()
     counts = defaultdict(int)
     box = settings.local_box
-    for d in db.paged_view('tweet/plc',include_docs=True,startkey="null",startkey_docid=start,endkey_docid=end,stale="ok",page_size=2):
-        if 'coord' in d:
-            c = d['coord']['coordinates']
-            if box['lat'][0]<c[0]<box['lat'][1] and box['lng'][0]<c[1]<box['lng'][1]:
+    for row in db.paged_view(
+            'tweet/plc',
+            include_docs=True,
+            startkey=None,
+            endkey=None,
+            startkey_docid=start,
+            endkey_docid=end,
+            stale="ok"
+        ):
+        if 'coord' in row['doc']:
+            c = row['doc']['coord']['coordinates']
+            if box['lng'][0]<c[0]<box['lng'][1] and box['lat'][0]<c[1]<box['lat'][1]:
                 counts['inb']+=1
             else:
                 counts['outb']+=1
