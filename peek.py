@@ -3,10 +3,9 @@
 # be %run in ipython.  If you import it from another module, you're doing
 # something wrong.
 
-import json
 import itertools
 import time
-import os,errno
+import os
 import logging
 import sys
 import getopt
@@ -14,16 +13,13 @@ from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
 
-from couchdbkit import ResourceNotFound, BulkSaveError
-from couchdbkit.loaders import FileSystemDocsLoader
-import beanstalkc
+from couchdbkit import ResourceNotFound
 
 from settings import settings
 import twitter
 from models import *
-from gisgraphy import GisgraphyResource
 from scoredict import Scores, BUCKETS, log_score
-import lookup
+
 
 db = CouchDB(settings.couchdb_root+settings.region,True)
 res = twitter.TwitterResource()

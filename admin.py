@@ -6,16 +6,12 @@
 import json
 import itertools
 import time
-import os,errno
 import logging
-import random
-import gzip
 import heapq
 import sys
 import getopt
 from collections import defaultdict
 from datetime import datetime as dt
-from operator import itemgetter
 
 from couchdbkit import ResourceNotFound, BulkSaveError
 from couchdbkit.loaders import FileSystemDocsLoader
