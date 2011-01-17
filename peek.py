@@ -13,12 +13,17 @@ from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from couchdbkit import ResourceNotFound
 
 from settings import settings
 import twitter
 from models import *
 from scoredict import Scores, BUCKETS, log_score
+
 
 
 db = CouchDB(settings.couchdb_root+settings.region,True)
@@ -34,6 +39,15 @@ def connect(name):
 def all_users():
     return db.paged_view('_all_docs',include_docs=True,startkey='U',endkey='V')
 
+
+def place_tweets(start, end):
+    return db.paged_view('tweet/plc',
+            include_docs=True,
+            startkey=None,
+            endkey=None,
+            startkey_docid=start,
+            endkey_docid=end,
+            )
 
 def count_users(key):
     counts = defaultdict(int)
@@ -59,15 +73,7 @@ def count_locations(path='counts'):
 def count_tweets_in_box(start='T',end='U'):
     counts = defaultdict(int)
     box = settings.local_box
-    for row in db.paged_view(
-            'tweet/plc',
-            include_docs=True,
-            startkey=None,
-            endkey=None,
-            startkey_docid=start,
-            endkey_docid=end,
-            stale="ok"
-        ):
+    for row in place_tweets(start,end):
         if 'coord' in row['doc']:
             c = row['doc']['coord']['coordinates']
             if box['lng'][0]<c[0]<box['lng'][1] and box['lat'][0]<c[1]<box['lat'][1]:
@@ -77,6 +83,28 @@ def count_tweets_in_box(start='T',end='U'):
         else:
             counts['noco']+=1
     print dict(counts)
+
+
+def print_locs(start='T',end='U'):
+    for row in place_tweets(start,end):
+        if 'coord' in row['doc']:
+            c = row['doc']['coord']['coordinates']
+            print '%f\t%f'%tuple(c)
+
+
+def plot_tweets():
+    #usage: peek.py print_locs| peek.py plot_tweets
+    locs = ([float(s) for s in l.split()] for l in sys.stdin)
+    box = settings.local_box
+    lngs,lats = zip(*[
+            c for c in locs 
+            if box['lng'][0]<c[0]<box['lng'][1] and box['lat'][0]<c[1]<box['lat'][1]
+            ])
+    logging.info("read points")
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hexbin(lngs,lats,gridsize=250,bins='log',alpha=.25)
+    fig.savefig('../www/test.pdf')
 
 
 def count_recent():
