@@ -126,8 +126,7 @@ class Edges(TwitterModel):
     def rfriends(self):
         #figure out whether the user has more friends or followers
         lil,big = sorted([self.friends,self.followers],key=len)
-        big = set(big)
-        return [u for u in lil if u in big]
+        return set(lil).intersection(big)
 
 class JobBody(ModelPart):
     def put(self, stalk):

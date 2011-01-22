@@ -206,22 +206,25 @@ def _users_from_scores():
 
 
 def _users_from_db():
-    User.database = connect("bcstx_user")
+    User.database = connect("houtx_user")
     return (int(row['id']) for row in User.database.paged_view("_all_docs"))
     
 
 def fetch_edges():
-    Edges.database = connect("bcstx_edges")
+    Edges.database = connect("houtx_edges")
+    User.database = connect("houtx_user")
     old_edges = set(int(row['id']) for row in Edges.database.paged_view("_all_docs"))
     for uid in _users_from_db():
-        if uid not in old_edges:
-            try:
-                edges = twitter.get_edges(uid)
-            except Unauthorized:
-                logging.warn("unauthorized!")
-                continue
-            edges.save()
-            sleep_if_needed()
+        if uid in old_edges: continue
+        user = User.get_id(str(uid))
+        if user.protected: continue
+        try:
+            edges = twitter.get_edges(uid)
+        except Unauthorized:
+            logging.warn("unauthorized!")
+            continue
+        edges.save()
+        sleep_if_needed()
 
 
 def stdin_lookup():

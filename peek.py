@@ -40,7 +40,7 @@ def connect(name):
 
 
 def all_users():
-    return db.paged_view('_all_docs',include_docs=True,startkey='U',endkey='V')
+    return db.paged_view('_all_docs',include_docs=True,endkey='_')
 
 
 def place_tweets(start, end):
@@ -111,19 +111,20 @@ def plot_tweets():
     lngs,lats = zip(*[
             c[0:2] for c in locs
             #if math.hypot(c[0]-mid_x,c[1]-mid_y)<10
-            if -96<c[0]<-94.6 and 29.2<c[1]<30.4
+            #if -96<c[0]<-94.6 and 29.2<c[1]<30.4
             ])
     fig = plt.figure()
     ax = fig.add_subplot(111)
     cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k","k"])
-    ax.hexbin(lngs,lats,
-            gridsize=200,
-            alpha=.5,
-            mincnt=1,
-            linewidth=.0001,
-            bins='log',
-            cmap = LinearSegmentedColormap.from_list("gray_map",["w","w","w","w","r","r"]),
-            )
+    if False:
+        ax.hexbin(lngs,lats,
+                gridsize=200,
+                alpha=.5,
+                mincnt=1,
+                linewidth=.0001,
+                bins='log',
+                cmap = LinearSegmentedColormap.from_list("gray_map",["w","w","w","w","r","r"]),
+                )
     ax.hexbin(lngs,lats,
             gridsize=2000,
             bins='log',
@@ -133,8 +134,8 @@ def plot_tweets():
             )
     ax.set_xlabel("longitude")
     ax.set_ylabel("latitude")
-    ax.set_title("Tweets from Houston, TX (11/26/2010-1/14/2010)")
-    fig.savefig('../www/houtx.pdf')
+    #ax.set_title("Tweets from Houston, TX (11/26/2010-1/14/2010)")
+    fig.savefig('../www/world.pdf')
 
 
 def dist_histogram():
@@ -262,6 +263,41 @@ def krishna_export(start=[2010],end=None):
                         print>>f,"%d %s %s %s"%(ts,t['_id'],t['uid'],at)
                 else:
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
+
+
+def _triangle_set():
+    db = connect('houtx_user')
+    users = db.paged_view('_all_docs',include_docs=True,endkey="_")
+    for row in users:
+        user = row['doc']
+        if user['prot'] or user['prob']==.5:
+            continue
+        if user['frdc']>2000 and user['folc']>2000:
+            continue
+        if user['prob']==0 or row['id'][-1]=="8":
+            yield int(row['id'])
+
+
+def find_tris():
+    Edges.database = connect("houtx_edges")
+    users = set(_triangle_set())
+    logging.info("looking at %d users",len(users))
+    edges = {}
+    for uid in tuple(users):
+        try:
+            obj = Edges.get_id(str(uid))
+        except ResourceNotFound:
+            users.remove(uid)
+        edges[uid] = users.intersection(
+                (int(f) for f in obj.friends if int(f)>uid),
+                (int(f) for f in obj.followers if int(f)>uid),
+                )
+    for me in users:
+        for friend in edges[me]:
+            amigos = edges[me].intersection(edges[friend])
+            for amigo in amigos:
+                print " ".join(str(id) for id in (me, friend, amigo))
+
 
 def rfriends():
     db = connect('houtx_edges')
