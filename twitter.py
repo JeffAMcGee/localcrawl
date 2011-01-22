@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from restkit.errors import RequestFailed, Unauthorized
 from settings import settings
-from models import Relationships, User, Tweet, as_local_id, as_int_id
+from models import Edges, User, Tweet, as_local_id, as_int_id
 from couchdbkit import BulkSaveError
 
 
@@ -66,10 +66,11 @@ class TwitterResource(Resource):
     def get_ids(self, path, user_id, **kwargs):
         ids=self.get_d(
             path=path,
-            user_id=as_int_id(user_id),
+            user_id=user_id,
+            cursor=-1,
             **kwargs
         )
-        return (as_local_id('U',id) for id in ids)
+        return (str(id) for id in ids['ids'])
 
     def user_lookup(self, user_ids, screen_names=None, **kwargs):
         ids = ','.join(str(as_int_id(u)) for u in user_ids)
@@ -93,9 +94,9 @@ class TwitterResource(Resource):
     def followers_ids(self, user_id):
         return self.get_ids("followers/ids.json", user_id)
 
-    def get_relationships(self, user_id):
-        return Relationships(
-                _id=as_int_id(user_id),
+    def get_edges(self, user_id):
+        return Edges(
+                _id=user_id,
                 friends=self.friends_ids(user_id),
                 followers=self.followers_ids(user_id),
         )

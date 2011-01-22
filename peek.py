@@ -9,6 +9,7 @@ import os
 import logging
 import sys
 import getopt
+import math
 from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
@@ -16,6 +17,8 @@ from operator import itemgetter
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import numpy
 
 from couchdbkit import ResourceNotFound
 
@@ -48,6 +51,7 @@ def place_tweets(start, end):
             startkey_docid=start,
             endkey_docid=end,
             )
+
 
 def count_users(key):
     counts = defaultdict(int)
@@ -89,22 +93,77 @@ def print_locs(start='T',end='U'):
     for row in place_tweets(start,end):
         if 'coord' in row['doc']:
             c = row['doc']['coord']['coordinates']
-            print '%f\t%f'%tuple(c)
+            print '%f\t%f\t%s'%(c[0],c[1],row['doc']['uid'])
+
+
+def read_locs(path=None):
+    for l in open(path or "locs_uid"):
+        s = l.split()
+        yield float(s[0]),float(s[1]),s[2]
+    logging.info("read points")
 
 
 def plot_tweets():
     #usage: peek.py print_locs| peek.py plot_tweets
-    locs = ([float(s) for s in l.split()] for l in sys.stdin)
+    locs = read_locs()
+    mid_x,mid_y = (-95.4,29.8)
     box = settings.local_box
     lngs,lats = zip(*[
-            c for c in locs 
-            if box['lng'][0]<c[0]<box['lng'][1] and box['lat'][0]<c[1]<box['lat'][1]
+            c[0:2] for c in locs
+            #if math.hypot(c[0]-mid_x,c[1]-mid_y)<10
+            if -96<c[0]<-94.6 and 29.2<c[1]<30.4
             ])
-    logging.info("read points")
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.hexbin(lngs,lats,gridsize=250,bins='log',alpha=.25)
-    fig.savefig('../www/test.pdf')
+    cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k","k"])
+    ax.hexbin(lngs,lats,
+            gridsize=200,
+            alpha=.5,
+            mincnt=1,
+            linewidth=.0001,
+            bins='log',
+            cmap = LinearSegmentedColormap.from_list("gray_map",["w","w","w","w","r","r"]),
+            )
+    ax.hexbin(lngs,lats,
+            gridsize=2000,
+            bins='log',
+            cmap=cmap,
+            mincnt=1,
+            linewidth=.0001,
+            )
+    ax.set_xlabel("longitude")
+    ax.set_ylabel("latitude")
+    ax.set_title("Tweets from Houston, TX (11/26/2010-1/14/2010)")
+    fig.savefig('../www/houtx.pdf')
+
+
+def dist_histogram():
+    mid_x,mid_y = (-95.4,29.8)
+    locs = read_locs()
+    dists = [math.hypot((loc[0]-mid_x),loc[1]-mid_y) for loc in locs]
+    dists = [x for x in dists if x<5]
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hist(dists,bins=100)
+    fig.savefig('../www/hist.png')
+
+
+def user_stddev(path=None):
+    means = []
+    locs = sorted(read_locs(path),key=itemgetter(2))
+    for k,g in itertools.groupby(locs,key=itemgetter(2)):
+        lats,lngs = zip(*[x[0:2] for x in g])
+        if len(lats)==1: continue
+        m_lat,m_lng = numpy.mean(lats),numpy.mean(lngs)
+        dists = (math.hypot(m_lat-x,m_lng-y) for x,y in zip(lats,lngs))
+        mean = sum(dists)/len(lats)
+        #if mean<2:
+        means.append(70*mean)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hist(means,bins=100,log=False)
+    fig.savefig('../www/user.png')
+    print numpy.median(means)
 
 
 def count_recent():
@@ -204,6 +263,23 @@ def krishna_export(start=[2010],end=None):
                 else:
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
 
+def rfriends():
+    db = connect('houtx_edges')
+    edges = db.paged_view('_all_docs',include_docs=True)
+    clowns = 0
+    nobodys = 0
+    for row in edges:
+        d = row['doc']
+        if len(d['frs'])>2000 and len(d['fols'])>2000:
+            clowns+=1
+            continue
+        rfs = set(d['frs']).intersection(d['fols'])
+        if not rfs:
+            nobodys+=1
+            continue
+        print " ".join([d['_id']]+list(rfs))
+    logging.info("clowns: %d",clowns)
+    logging.info("nobodys: %d",nobodys)
 
 if __name__ == '__main__' and len(sys.argv)>1:
     try:

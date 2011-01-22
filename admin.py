@@ -14,6 +14,7 @@ from collections import defaultdict
 from datetime import datetime as dt
 
 from couchdbkit import ResourceNotFound, BulkSaveError
+from restkit.errors import Unauthorized
 from couchdbkit.loaders import FileSystemDocsLoader
 import beanstalkc
 
@@ -21,12 +22,12 @@ from settings import settings
 import twitter
 from models import *
 from gisgraphy import GisgraphyResource
-from scoredict import Scores, BUCKETS, log_score
+from scoredict import Scores, BUCKETS, log_score, DONE
 import lookup
 
 gisgraphy = GisgraphyResource()
 db = CouchDB(settings.couchdb_root+settings.region,True)
-res = twitter.TwitterResource()
+twitter = twitter.TwitterResource()
 Model.database = db
 logging.basicConfig(level=logging.INFO)
 
@@ -117,7 +118,7 @@ def fake_lu_master():
 
 def fake_lu_slave():
     proc = lookup.LookupSlave('y')
-    Relationships.database = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
+    Edges.database = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
     view = db.paged_view('dev/user_and_tweets',include_docs=True)
     for k,g in itertools.groupby(view, lambda r:r['key'][0]):
         user_d = g.next()
@@ -130,7 +131,7 @@ def fake_lu_slave():
         if user.local_prob != 1.0:
             continue
         try:
-            rels = Relationships.get_for_user_id(user._id)
+            rels = Edges.get_for_user_id(user._id)
         except ResourceNotFound:
             print "rels not found"
             rels = None
@@ -195,6 +196,34 @@ def force_lookup(to_db="hou",start_id='',end_id=None):
         user_lookup(user)
 
 
+def _users_from_scores():
+    scores = Scores()
+    scores.read(settings.lookup_out)
+    for uid in scores:
+        state, rfs, ats = scores.split(uid)
+        if state==DONE:
+            yield uid
+
+
+def _users_from_db():
+    User.database = connect("bcstx_user")
+    return (int(row['id']) for row in User.database.paged_view("_all_docs"))
+    
+
+def fetch_edges():
+    Edges.database = connect("bcstx_edges")
+    old_edges = set(int(row['id']) for row in Edges.database.paged_view("_all_docs"))
+    for uid in _users_from_db():
+        if uid not in old_edges:
+            try:
+                edges = twitter.get_edges(uid)
+            except Unauthorized:
+                logging.warn("unauthorized!")
+                continue
+            edges.save()
+            sleep_if_needed()
+
+
 def stdin_lookup():
     from_db = connect("orig_houtx")
     for l in sys.stdin:
@@ -203,7 +232,7 @@ def stdin_lookup():
 
 
 def user_lookup(user):
-    tweets = res.save_timeline(user._id,last_tid=settings.min_tweet_id)
+    tweets = twitter.save_timeline(user._id,last_tid=settings.min_tweet_id)
     if not tweets: return
     user.last_tid = tweets[0]._id
     user.last_crawl_date = dt.utcnow()
@@ -216,9 +245,9 @@ def user_lookup(user):
 
 
 def sleep_if_needed():
-    logging.info("api calls remaining: %d",res.remaining)
-    if res.remaining < 10:
-        delta = (res.reset_time-dt.utcnow())
+    logging.info("api calls remaining: %d",twitter.remaining)
+    if twitter.remaining < 10:
+        delta = (twitter.reset_time-dt.utcnow())
         logging.info("goodnight for %r",delta)
         time.sleep(delta.seconds)
 

@@ -8,13 +8,20 @@ from maroon import *
 
 from settings import settings
 
-
 def as_local_id(prefix,id):
+    raise NotImplementedError
+
+def _as_local_id(prefix,id):
     return "%c%d"%(prefix,id)
 
+def as_int_id(prefix,id):
+    raise NotImplementedError
 
-def as_int_id(id):
-    return int(id[1:])
+def _as_int_id(id):
+    try:
+        return int(id)
+    except ValueError:
+        return int(id[1:])
 
 
 class TwitterModel(Model):
@@ -30,16 +37,11 @@ class TwitterModel(Model):
             logging.warn("conflict on %s %s",self.__class__.__name__,self._id)
 
 class TwitterIdProperty(TextProperty):
-    def __init__(self, name, prefix, **kwargs):
+    def __init__(self, name, **kwargs):
         TextProperty.__init__(self, name, **kwargs)
-        self._prefix = prefix
 
     def validated(self, val):
-        val = Property.validated(self, val)
-        if not isinstance(val, basestring):
-            return as_local_id(self._prefix, val)
-        return val
-
+        return Property.validated(self, str(val))
 
 class TwitterDateTimeProperty(DateTimeProperty):
     def  __init__(self, name, **kwargs):
@@ -54,13 +56,13 @@ class GeonamesPlace(ModelPart):
     population = IntProperty('pop')
 
 class User(TwitterModel):
-    _id = TwitterIdProperty('_id','U')
+    _id = TwitterIdProperty('_id')
 
     #local properties
     tweets_per_hour = FloatProperty('tph')
     lookup_done = BoolProperty('ld')
     next_crawl_date = DateTimeProperty('ncd')
-    last_tid = TwitterIdProperty('ltid','T')
+    last_tid = TwitterIdProperty('ltid')
     last_crawl_date = DateTimeProperty('lcd')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
@@ -88,8 +90,7 @@ class User(TwitterModel):
 
 
 class Tweet(TwitterModel):
-    _id = TwitterIdProperty('_id','T')
-    tid = TwitterIdProperty('tid','T')
+    _id = TwitterIdProperty('_id')
     mentions = SlugListProperty('ats') #based on entities
 
     #properties from twitter
@@ -97,35 +98,30 @@ class Tweet(TwitterModel):
     created_at = TwitterDateTimeProperty('ca')
     favorited = BoolProperty('fav')
     geo = Property('geo')
-    in_reply_to_status_id = TwitterIdProperty('rtt','T')
-    in_reply_to_user_id = TwitterIdProperty('rtu','U')
+    in_reply_to_status_id = TwitterIdProperty('rtt')
+    in_reply_to_user_id = TwitterIdProperty('rtu')
     place = Property('plc')
     text = TextProperty('tx')
-    user_id = TwitterIdProperty('uid','U')
-
-    # this is only for testing the automagic ids
-    tweet_id = TwitterIdProperty('tid','T')
+    user_id = TwitterIdProperty('uid')
 
     def __init__(self, from_dict=None, **kwargs):
         TwitterModel.__init__(self, from_dict, **kwargs)
         if self.user_id is None and 'user' in from_dict:
-            self.user_id = as_local_id('U',from_dict['user']['id'])
+            self.user_id = from_dict['user']['id']
         if self.mentions is None and 'entities' in from_dict:
-            self.mentions = [
-                as_local_id('U', at['id'])
-                for at in from_dict['entities']['user_mentions']
-            ]
+            ats = from_dict['entities']['user_mentions']
+            self.mentions = [ at['id'] for at in ats ]
 
 
-class Relationships(TwitterModel):
-    # I only stored the first 5000 friends and followers
-    _id = TwitterIdProperty('_id','R')
+class Edges(TwitterModel):
+    # I only store the first 5000 friends and followers
+    _id = TwitterIdProperty('_id')
     friends = SlugListProperty('frs')
     followers = SlugListProperty('fols')
     
     @classmethod
     def get_for_user_id(cls, _id):
-        return cls.get_id('R'+_id[1:])
+        return cls.get_id(_id)
 
     def rfriends(self):
         #figure out whether the user has more friends or followers
@@ -142,7 +138,7 @@ class JobBody(ModelPart):
         return cls(json.loads(job.body))
 
 class LookupJobBody(JobBody):
-    _id = TwitterIdProperty('_id','U')
+    _id = TwitterIdProperty('_id')
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     done = BoolProperty('done')

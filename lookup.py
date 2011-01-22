@@ -12,7 +12,7 @@ import sys
 import maroon
 from maroon import *
 
-from models import Relationships, User, Tweet, LookupJobBody, as_local_id, as_int_id
+from models import Edges, User, Tweet, LookupJobBody, as_local_id, as_int_id
 from twitter import TwitterResource
 from settings import settings
 from gisgraphy import GisgraphyResource
