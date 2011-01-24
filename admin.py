@@ -201,7 +201,7 @@ def _users_from_scores():
     scores.read(settings.lookup_out)
     for uid in scores:
         state, rfs, ats = scores.split(uid)
-        if state==DONE:
+        if log_score(rfs,ats)>=11:
             yield uid
 
 
@@ -212,19 +212,21 @@ def _users_from_db():
 
 def fetch_edges():
     Edges.database = connect("houtx_edges")
-    User.database = connect("houtx_user")
-    old_edges = set(int(row['id']) for row in Edges.database.paged_view("_all_docs"))
-    for uid in _users_from_db():
-        if uid in old_edges: continue
-        user = User.get_id(str(uid))
-        if user.protected: continue
-        try:
-            edges = twitter.get_edges(uid)
-        except Unauthorized:
-            logging.warn("unauthorized!")
-            continue
-        edges.save()
-        sleep_if_needed()
+    User.database = connect("away_user")
+    old_edges = set(int(row['id']) for row in Edges.database.paged_view("_all_docs",endkey="_"))
+    uids = set(_users_from_scores())-old_edges
+    settings.pdb()
+    for g in grouper(100,uids):
+        for user in twitter.user_lookup(g):
+            if user is None or user.protected: continue
+            try:
+                edges = twitter.get_edges(user._id)
+            except Unauthorized:
+                logging.warn("unauthorized!")
+                continue
+            edges.save()
+            user.save()
+            sleep_if_needed()
 
 
 def stdin_lookup():

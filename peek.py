@@ -18,6 +18,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.transforms import Bbox
 import numpy
 
 from couchdbkit import ResourceNotFound
@@ -25,8 +26,8 @@ from couchdbkit import ResourceNotFound
 from settings import settings
 import twitter
 from models import *
+from maroon import ModelCache
 from scoredict import Scores, BUCKETS, log_score
-
 
 
 db = CouchDB(settings.couchdb_root+settings.region,True)
@@ -116,15 +117,6 @@ def plot_tweets():
     fig = plt.figure()
     ax = fig.add_subplot(111)
     cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k","k"])
-    if False:
-        ax.hexbin(lngs,lats,
-                gridsize=200,
-                alpha=.5,
-                mincnt=1,
-                linewidth=.0001,
-                bins='log',
-                cmap = LinearSegmentedColormap.from_list("gray_map",["w","w","w","w","r","r"]),
-                )
     ax.hexbin(lngs,lats,
             gridsize=2000,
             bins='log',
@@ -297,6 +289,40 @@ def find_tris():
             amigos = edges[me].intersection(edges[friend])
             for amigo in amigos:
                 print " ".join(str(id) for id in (me, friend, amigo))
+
+
+def coord_in_miles(p1, p2):
+    return math.hypot(69.1*(p1.lat-p2.lat), 60.4*(p1.lng-p2.lng))
+
+
+def tri_legs():
+    User.database = connect("houtx_user")
+    users = ModelCache(User)
+    mins = []
+    maxs = []
+    for line in open("tris"):
+        tri = [users[id].geonames_place for id in line.split()]
+        legs = zip(tri,tri[1:]+tri[:1])
+        dists = sorted(coord_in_miles(*leg) for leg in legs)
+        if dists[2]<20:
+            mins.append(dists[0])
+            maxs.append(dists[2])
+        #if len(mins)>1000: break
+        #print "%f %f"%(dists[0],dists[2])
+    logging.info("read points")
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k"])
+    ax.hexbin(mins,maxs,
+            gridsize=500,
+            clip_box=Bbox.from_bounds(0,0,1000,1000),
+            clip_on=True,
+            bins="log",
+            cmap=cmap,
+            mincnt=1,
+            linewidth=.0001,
+            )
+    fig.savefig('../www/tri_hou.png')
 
 
 def rfriends():
