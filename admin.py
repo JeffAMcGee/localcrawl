@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime as dt
 
 from couchdbkit import ResourceNotFound, BulkSaveError
-from restkit.errors import Unauthorized
+import restkit.errors
 from couchdbkit.loaders import FileSystemDocsLoader
 import beanstalkc
 
@@ -221,8 +221,11 @@ def fetch_edges():
             if user is None or user.protected: continue
             try:
                 edges = twitter.get_edges(user._id)
-            except Unauthorized:
+            except restkit.errors.Unauthorized:
                 logging.warn("unauthorized!")
+                continue
+            except restkit.errors.ResourceNotFound:
+                logging.warn("resource not found!?")
                 continue
             edges.save()
             user.save()
