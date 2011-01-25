@@ -139,6 +139,15 @@ def fake_lu_slave():
     print "done"
 
 
+def update_loc():
+    User.database = connect("houtx_user")
+    for user in User.get_all():
+        old = user.local_prob
+        user.local_prob = lookup.guess_location(user,gisgraphy)
+        if old != user.local_prob:
+            user.save()
+
+
 def merge_views(*views):
     # This is based on heapq.merge in python 2.6.  The big difference is
     # that it sorts by key.

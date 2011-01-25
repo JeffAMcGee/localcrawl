@@ -266,7 +266,7 @@ def _triangle_set():
             continue
         if user['frdc']>2000 and user['folc']>2000:
             continue
-        if user['prob']==0 or row['id'][-1]=="8":
+        if user['prob']!=.5:
             yield int(row['id'])
 
 
@@ -300,11 +300,11 @@ def tri_legs():
     users = ModelCache(User)
     mins = []
     maxs = []
-    for line in open("tris"):
+    for line in open("more_tris"):
         tri = [users[id].geonames_place for id in line.split()]
         legs = zip(tri,tri[1:]+tri[:1])
         dists = sorted(coord_in_miles(*leg) for leg in legs)
-        if dists[2]<20:
+        if dists[2]<1000:
             mins.append(dists[0])
             maxs.append(dists[2])
         #if len(mins)>1000: break
@@ -322,7 +322,7 @@ def tri_legs():
             mincnt=1,
             linewidth=.0001,
             )
-    fig.savefig('../www/tri_hou.png')
+    fig.savefig('../www/tri.png')
 
 
 def rfriends():

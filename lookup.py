@@ -121,21 +121,22 @@ class LookupMaster(LocalProc):
                 self.lookups+=1
 
 
+def guess_location(user, gisgraphy):
+    if not user.location:
+        return .5
+    place = gisgraphy.twitter_loc(user.location)
+    if not place:
+        return .5
+    user.geonames_place = place
+    return 1 if gisgraphy.in_local_box(place.to_d()) else 0
+
+
 class LookupSlave(LocalProc):
     def __init__(self,slave_id):
         LocalProc.__init__(self,'lookup',slave_id)
         self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
         self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
-
-    def _guess_location(self,user):
-        if not user.location:
-            return .5
-        place = self.gisgraphy.twitter_loc(user.location)
-        if not place:
-            return .5
-        user.geonames_place = place
-        return 1 if self.gisgraphy.in_local_box(place.to_d()) else 0
 
     def run(self):
         while True:
@@ -174,7 +175,7 @@ class LookupSlave(LocalProc):
             logging.info("api calls remaining: %d",self.twitter.remaining)
 
     def crawl_user(self,user):
-        user.local_prob = self._guess_location(user)
+        user.local_prob = guess_location(user,self.gisgraphy)
         if user.local_prob != 1.0 or user.protected:
             return
         rels=None
