@@ -55,15 +55,17 @@ class GisgraphyResource(Resource):
             if len(parts)==2:
                 for part in parts:
                     res = self.twitter_loc(part)
-                    if res and self.in_local_box(res.to_d()):
+                    if res and in_local_box(res.to_d()):
                         return res
                     if res:
                         found = res
         return found
 
-    def in_local_box(self, place):
-        box = settings.local_box
-        return all(box[d][0]<place[d]<box[d][1] for d in ('lat','lng'))
+
+def in_local_box(place):
+    box = settings.local_box
+    return all(box[d][0]<place[d]<box[d][1] for d in ('lat','lng'))
+
 
 if __name__ == '__main__':
     res = GisgraphyResource()

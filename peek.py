@@ -6,6 +6,7 @@
 import itertools
 import time
 import os
+import random
 import logging
 import sys
 import getopt
@@ -24,6 +25,7 @@ import numpy
 from couchdbkit import ResourceNotFound
 
 from settings import settings
+from gisgraphy import in_local_box
 import twitter
 from models import *
 from maroon import ModelCache
@@ -302,27 +304,33 @@ def tri_legs():
     maxs = []
     for line in open("more_tris"):
         tri = [users[id].geonames_place for id in line.split()]
-        legs = zip(tri,tri[1:]+tri[:1])
-        dists = sorted(coord_in_miles(*leg) for leg in legs)
-        if dists[2]<1000:
-            mins.append(dists[0])
-            maxs.append(dists[2])
+        random.shuffle(tri)
+        #legs = zip(tri,tri[1:]+tri[:1])
+        #dists = [coord_in_miles(*leg) for leg in legs]
+        #min_d,max_d = sorted([coord_in_miles(tri[0],tri[x]) for x in (1,2)])
+        min_d,max_d = [coord_in_miles(tri[0],tri[x]) for x in (1,2)]
+        if not in_local_box(tri[0].to_d()):
+            continue
+            #max_d,min_d=min_d,max_d
+        if .01<max_d<100 and .01<min_d<100:
+            mins.append(min_d)
+            maxs.append(max_d)
         #if len(mins)>1000: break
         #print "%f %f"%(dists[0],dists[2])
     logging.info("read points")
-    fig = plt.figure()
+    fig = plt.figure(figsize=(18,18))
     ax = fig.add_subplot(111)
     cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k"])
     ax.hexbin(mins,maxs,
             gridsize=500,
-            clip_box=Bbox.from_bounds(0,0,1000,1000),
-            clip_on=True,
+            #clip_box=Bbox.from_bounds(0,0,1000,1000),
+            #clip_on=True,
             bins="log",
             cmap=cmap,
             mincnt=1,
             linewidth=.0001,
             )
-    fig.savefig('../www/tri.png')
+    fig.savefig('../www/tri_hou.png')
 
 
 def rfriends():
