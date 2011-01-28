@@ -11,11 +11,12 @@ from restkit import Unauthorized
 import logging
 import multiprocessing
 import Queue
+import pdb
 
 import maroon
 from maroon import *
 
-from models import Relationships, User, Tweet, JobBody, as_local_id, as_int_id
+from models import User, Tweet
 from twitter import TwitterResource
 from settings import settings
 from gisgraphy import GisgraphyResource
@@ -27,8 +28,8 @@ def set_halt(x=None,y=None):
     print "halting"
     global HALT
     HALT=True
-signal.signal(signal.SIGINT, set_halt)
-signal.signal(signal.SIGUSR1, set_halt)
+#signal.signal(signal.SIGINT, set_halt)
+#signal.signal(signal.SIGUSR1, set_halt)
 
 
 class CrawlMaster(LocalProc):
@@ -59,7 +60,7 @@ class CrawlMaster(LocalProc):
             if uid in self.waiting: continue # they are queued
             self.waiting.add(uid)
             self.todo.put(uid)
-            
+
             if len(self.waiting)%100==0:
                 # let the queue empty a bit
                 self.read_crawled()
@@ -82,7 +83,8 @@ class CrawlSlave(LocalProc):
         self.done = done
 
     def run(self):
-        Tweet.database = CouchDB(settings.couchdb_root+"hou_tweets",True)
+        Tweet.database = CouchDB(settings.couchdb_root+"hou_new_tweet",True)
+        #pdb.Pdb(stdin=open('/dev/stdin', 'r+'), stdout=open('/dev/stdout', 'r+')).set_trace()
         while not HALT:
             user=None
             try:
@@ -121,6 +123,7 @@ class CrawlSlave(LocalProc):
 
 
 if __name__ == '__main__':
+    User.database = CouchDB(settings.couchdb_root+"houtx_user",True)
     proc = CrawlMaster()
     create_slaves(CrawlSlave, proc.todo, proc.done)
     proc.run()

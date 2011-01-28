@@ -110,7 +110,7 @@ class Tweet(TwitterModel):
             self.user_id = from_dict['user']['id']
         if self.mentions is None and 'entities' in from_dict:
             ats = from_dict['entities']['user_mentions']
-            self.mentions = [ at['id'] for at in ats ]
+            self.mentions = [ str(at['id']) for at in ats ]
 
 
 class Edges(TwitterModel):

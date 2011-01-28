@@ -269,12 +269,15 @@ def _triangle_set():
         if user['frdc']>2000 and user['folc']>2000:
             continue
         if user['prob']!=.5:
-            yield int(row['id'])
+            yield dict(
+                    id=int(row['id']),
+                    lat=user['gnp']['lat'],
+                    lng=user['gnp']['lng'])
 
 
 def find_tris():
     Edges.database = connect("houtx_edges")
-    users = set(_triangle_set())
+    users = dict(_triangle_set())
     logging.info("looking at %d users",len(users))
     edges = {}
     for uid in tuple(users):

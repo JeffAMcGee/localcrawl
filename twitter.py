@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from restkit.errors import RequestFailed, Unauthorized
 from settings import settings
-from models import Edges, User, Tweet, as_local_id, as_int_id
+from models import Edges, User, Tweet
 from couchdbkit import BulkSaveError
 
 
@@ -104,7 +104,7 @@ class TwitterResource(Resource):
     def user_timeline(self, user_id, count=200, **kwargs):
         timeline = self.get_d(
             "statuses/user_timeline.json",
-            user_id=as_int_id(user_id),
+            user_id=user_id,
             trim_user=1,
             include_rts=1,
             include_entities=1,
@@ -114,8 +114,8 @@ class TwitterResource(Resource):
         return [Tweet(t) for t in timeline]
 
     def save_timeline(self, uid, last_tid, max_tid=None):
-        since_id = as_int_id(last_tid)-1
-        max_id = as_int_id(max_tid)-1 if max_tid else None
+        since_id = int(last_tid)-1
+        max_id = int(max_tid)-1 if max_tid else None
 
         all_tweets = []
         while since_id != max_id:
@@ -135,12 +135,12 @@ class TwitterResource(Resource):
             if len(tweets)<175:
                 #there are no more tweets, and since_id+1 was deleted
                 break
-            max_id =as_int_id(tweets[-1]._id)-1
+            max_id =int(tweets[-1]._id)-1
             if len(all_tweets)>=3100:
                 logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
                 break
         try:
-            Tweet.database.bulk_save_models(t for t in all_tweets if as_int_id(t._id)-1>since_id)
+            Tweet.database.bulk_save_models(t for t in all_tweets if int(t._id)-1>since_id)
         except BulkSaveError as err:
             #ignore conflicts
             if any(d['error']!='conflict' for d in err.errors):
