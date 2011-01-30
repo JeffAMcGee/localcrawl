@@ -269,32 +269,35 @@ def _triangle_set():
         if user['frdc']>2000 and user['folc']>2000:
             continue
         if user['prob']!=.5:
-            yield dict(
-                    id=int(row['id']),
-                    lat=user['gnp']['lat'],
-                    lng=user['gnp']['lng'])
+            user['gnp']['id']=int(row['id'])
+            yield user['gnp']
 
 
-def find_tris():
+def find_tris(fake=False):
     Edges.database = connect("houtx_edges")
-    users = dict(_triangle_set())
+    users = dict((d['id'],d) for d in _triangle_set())
     logging.info("looking at %d users",len(users))
     edges = {}
-    for uid in tuple(users):
+    uids = set(users.iterkeys())
+    for uid in uids:
         try:
             obj = Edges.get_id(str(uid))
         except ResourceNotFound:
-            users.remove(uid)
-        edges[uid] = users.intersection(
-                (int(f) for f in obj.friends if int(f)>uid),
-                (int(f) for f in obj.followers if int(f)>uid),
+            pass
+        edges[uid] = uids.intersection(
+                (int(f) for f in obj.friends),
+                (int(f) for f in obj.followers),
                 )
+    settings.pdb()
+    operation = set.difference if fake else set.intersection
     for me in users:
         for friend in edges[me]:
-            amigos = edges[me].intersection(edges[friend])
+            amigos = operation(edges[me],edges[friend])
             for amigo in amigos:
-                print " ".join(str(id) for id in (me, friend, amigo))
-
+                if friend>amigo:
+                    us = [users.get(id) for id in (me, friend, amigo)]
+                    if all(us):
+                        print json.dumps(us)
 
 def coord_in_miles(p1, p2):
     return math.hypot(69.1*(p1.lat-p2.lat), 60.4*(p1.lng-p2.lng))
