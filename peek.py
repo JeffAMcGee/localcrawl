@@ -268,75 +268,78 @@ def _triangle_set():
             continue
         if user['frdc']>2000 and user['folc']>2000:
             continue
-        if user['prob']!=.5:
-            user['gnp']['id']=int(row['id'])
-            yield user['gnp']
+        yield user
 
 
 def find_tris(fake=False):
     Edges.database = connect("houtx_edges")
-    users = dict((d['id'],d) for d in _triangle_set())
-    logging.info("looking at %d users",len(users))
+    uids = set(int(d['_id']) for d in _triangle_set())
+    logging.info("looking at %d users",len(uids))
     edges = {}
-    uids = set(users.iterkeys())
     for uid in uids:
         try:
             obj = Edges.get_id(str(uid))
         except ResourceNotFound:
-            pass
+            edges[uid]=set()
         edges[uid] = uids.intersection(
                 (int(f) for f in obj.friends),
                 (int(f) for f in obj.followers),
                 )
-    settings.pdb()
     operation = set.difference if fake else set.intersection
-    for me in users:
+    for me in uids:
         for friend in edges[me]:
             amigos = operation(edges[me],edges[friend])
             for amigo in amigos:
                 if friend>amigo:
-                    us = [users.get(id) for id in (me, friend, amigo)]
-                    if all(us):
-                        print json.dumps(us)
-
-def coord_in_miles(p1, p2):
-    return math.hypot(69.1*(p1.lat-p2.lat), 60.4*(p1.lng-p2.lng))
+                    print " ".join(str(id) for id in (me, friend, amigo))
 
 
-def tri_legs():
-    User.database = connect("houtx_user")
-    users = ModelCache(User)
+def _coord_in_miles(p1, p2):
+    return math.hypot(69.1*(p1['lat']-p2['lat']), 60.4*(p1['lng']-p2['lng']))
+
+
+def tri_users():
+    for user in _triangle_set():
+        small = user['gnp']
+        small['id'] = user['_id']
+        print json.dumps(small)
+
+
+def _read_tri_users(path):
+    for l in open(path):
+        yield json.loads(l)
+
+
+def tri_legs(out_path='tri_hou.png',tris_path="tris",users_path="tri_users.json"):
+    users = dict((d['id'],d) for d in _read_tri_users(users_path))
+    logging.info("read users")
     mins = []
     maxs = []
-    for line in open("more_tris"):
-        tri = [users[id].geonames_place for id in line.split()]
-        random.shuffle(tri)
-        #legs = zip(tri,tri[1:]+tri[:1])
-        #dists = [coord_in_miles(*leg) for leg in legs]
-        #min_d,max_d = sorted([coord_in_miles(tri[0],tri[x]) for x in (1,2)])
-        min_d,max_d = [coord_in_miles(tri[0],tri[x]) for x in (1,2)]
-        if not in_local_box(tri[0].to_d()):
+    for line in open(tris_path):
+        if len(mins)%10000 ==0:
+            logging.info("read %d",len(mins))
+        tri = [users[id] for id in line.split()]
+        #min_d,max_d = sorted([_coord_in_miles(tri[0],tri[x]) for x in (1,2)])
+        min_d,max_d = [_coord_in_miles(tri[0],tri[x]) for x in (1,2)]
+        if not in_local_box(tri[0]):
             continue
             #max_d,min_d=min_d,max_d
         if .01<max_d<100 and .01<min_d<100:
             mins.append(min_d)
             maxs.append(max_d)
-        #if len(mins)>1000: break
-        #print "%f %f"%(dists[0],dists[2])
-    logging.info("read points")
+        if len(mins)>807690: break
+    logging.info("read %d triangles",len(mins))
     fig = plt.figure(figsize=(18,18))
     ax = fig.add_subplot(111)
     cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k"])
     ax.hexbin(mins,maxs,
             gridsize=500,
-            #clip_box=Bbox.from_bounds(0,0,1000,1000),
-            #clip_on=True,
             bins="log",
             cmap=cmap,
             mincnt=1,
             linewidth=.0001,
             )
-    fig.savefig('../www/tri_hou.png')
+    fig.savefig('../www/'+out_path)
 
 
 def rfriends():
