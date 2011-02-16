@@ -8,7 +8,6 @@ import time
 import os
 import random
 import logging
-import sys
 import getopt
 import math
 from collections import defaultdict
@@ -32,22 +31,12 @@ from maroon import ModelCache
 from scoredict import Scores, BUCKETS, log_score
 
 
-db = CouchDB(settings.couchdb_root+settings.region,True)
-res = twitter.TwitterResource()
-Model.database = db
-logging.basicConfig(level=logging.INFO)
-
-
-def connect(name):
-    return CouchDB(settings.couchdb_root+name,True)
-
-
 def all_users():
-    return db.paged_view('_all_docs',include_docs=True,endkey='_')
+    return Model.database.paged_view('_all_docs',include_docs=True,endkey='_')
 
 
 def place_tweets(start, end):
-    return db.paged_view('tweet/plc',
+    return Model.database.paged_view('tweet/plc',
             include_docs=True,
             startkey=None,
             endkey=None,
@@ -106,9 +95,17 @@ def read_locs(path=None):
     logging.info("read points")
 
 
+
+def _read_gis_locs(path=None):
+    for u in _read_tri_users(path or "hou_tri_users"):
+        yield u['lng'],u['lat']
+
+def _noisy(ray,scale):
+    return ray+numpy.random.normal(0.0,scale,len(ray))
+
 def plot_tweets():
     #usage: peek.py print_locs| peek.py plot_tweets
-    locs = read_locs()
+    locs = _read_gis_locs()
     mid_x,mid_y = (-95.4,29.8)
     box = settings.local_box
     lngs,lats = zip(*[
@@ -116,20 +113,18 @@ def plot_tweets():
             #if math.hypot(c[0]-mid_x,c[1]-mid_y)<10
             #if -96<c[0]<-94.6 and 29.2<c[1]<30.4
             ])
-    fig = plt.figure()
+    fig = plt.figure(figsize=(18,18))
     ax = fig.add_subplot(111)
-    cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k","k"])
-    ax.hexbin(lngs,lats,
-            gridsize=2000,
-            bins='log',
-            cmap=cmap,
-            mincnt=1,
-            linewidth=.0001,
+    cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k"])
+    ax.plot(_noisy(lngs,.005),_noisy(lats,.005),',',
+            color='k',
+            alpha=.2,
             )
+    print len(lngs)
     ax.set_xlabel("longitude")
     ax.set_ylabel("latitude")
     #ax.set_title("Tweets from Houston, TX (11/26/2010-1/14/2010)")
-    fig.savefig('../www/world.pdf')
+    fig.savefig('../www/hou_gis.png')
 
 
 def dist_histogram():
@@ -163,7 +158,7 @@ def user_stddev(path=None):
 
 def count_recent():
     min_int_id = 8000000000000000L
-    view = db.paged_view('user/and_tweets')
+    view = Model.database.paged_view('user/and_tweets')
     for k,g in itertools.groupby(view, lambda r:r['key'][0]):
             user_d = g.next()
             if user_d['id'][0] != 'U':
@@ -186,7 +181,7 @@ def count_sn(path):
     sns = (sn.strip() for sn in open(path))
     for group in grouper(100,sns):
         for user in res.user_lookup([], screen_names=group):
-            if user._id in db:
+            if user._id in Model.database:
                 found+=1
                 print "found %s - %s"%(user.screen_name,user._id)
             else:
@@ -259,16 +254,44 @@ def krishna_export(start=[2010],end=None):
                     print>>f,"%d %s %s"%(ts,t['_id'],t['uid'])
 
 
-def _triangle_set():
-    db = connect('houtx_user')
-    users = db.paged_view('_all_docs',include_docs=True,endkey="_")
+def _triangle_set(strict=True):
+    Model.database = connect('houtx_user')
+    users = Model.database.paged_view('_all_docs',include_docs=True,endkey="_")
     for row in users:
         user = row['doc']
         if user['prot'] or user['prob']==.5:
             continue
         if user['frdc']>2000 and user['folc']>2000:
             continue
+        if strict and (user['prob']==0 or user['gnp'].get('pop',0)>1000000):
+            continue
         yield user
+
+
+def count_friends(users_path="hou_tri_users"):
+    users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
+    uids = set(users)
+    logging.info("looking at %d users",len(users))
+    counts = []
+    for u in users:
+        obj = Edges.get_id(int(u))
+        if obj._id==None:
+            continue
+        counts.append(len(uids.intersection(obj.friends)))
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hist(counts,bins=range(100))
+    fig.savefig('../www/fr_hist.png')
+
+
+def edge_dist(users_path="hou_tri_users"):
+    users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
+    uids = set(users)
+    logging.info("looking at %d users",len(users))
+    for u in users:
+        obj = Edges.get_id(int(u))
+        if obj._id==None:
+            continue
 
 
 def find_tris(fake=False):
@@ -294,8 +317,22 @@ def find_tris(fake=False):
                     print " ".join(str(id) for id in (me, friend, amigo))
 
 
+def _coord_params(p1, p2):
+    return (69.1*(p1['lat']-p2['lat']), 60.4*(p1['lng']-p2['lng']))
+
+
+def _coord_angle(p, p1, p2):
+    "find the angle between rays from p to p1 and p2, return None if p in (p1,p2)"
+    vs = [_coord_params(p,x) for x in (p1,p2)]
+    mags = [numpy.linalg.norm(v) for v in vs]
+    if any(m==0 for m in mags):
+        return math.pi
+    cos = numpy.dot(*vs)/mags[0]/mags[1]
+    return math.acos(min(cos,1))*180/math.pi
+
+
 def _coord_in_miles(p1, p2):
-    return math.hypot(69.1*(p1['lat']-p2['lat']), 60.4*(p1['lng']-p2['lng']))
+    return math.hypot(*_coord_params(p1,p2))
 
 
 def tri_users():
@@ -311,40 +348,62 @@ def _read_tri_users(path):
 
 
 def tri_legs(out_path='tri_hou.png',tris_path="tris",users_path="tri_users.json"):
-    users = dict((d['id'],d) for d in _read_tri_users(users_path))
+    if users_path=="couch":
+        User.database = connect("houtx_user")
+        users = ModelCache(User)
+        def user_find(id):
+            return users[id].geonames_place.to_d()
+    else:
+        users = dict((d['id'],d) for d in _read_tri_users(users_path))
+        def user_find(id):
+            return users[id]
+
     logging.info("read users")
-    mins = []
-    maxs = []
+    xs,ys,zs = [],[],[]
+    angs = []
+    obtuse=0
+    distinct=0
     for line in open(tris_path):
-        if len(mins)%10000 ==0:
-            logging.info("read %d",len(mins))
-        tri = [users[id] for id in line.split()]
-        #min_d,max_d = sorted([_coord_in_miles(tri[0],tri[x]) for x in (1,2)])
-        min_d,max_d = [_coord_in_miles(tri[0],tri[x]) for x in (1,2)]
-        if not in_local_box(tri[0]):
-            continue
-            #max_d,min_d=min_d,max_d
-        if .01<max_d<100 and .01<min_d<100:
-            mins.append(min_d)
-            maxs.append(max_d)
-        if len(mins)>807690: break
-    logging.info("read %d triangles",len(mins))
+        if random.random()>44324/341318.0: continue
+        if len(ys)%10000 ==0:
+            logging.info("read %d",len(ys))
+        tri = [user_find(id) for id in line.split()]
+        dy,dx = sorted([_coord_in_miles(tri[0],tri[x]) for x in (1,2)])
+        #dy,dx = [_coord_in_miles(tri[0],tri[x]) for x in (1,2)]
+        angle = _coord_angle(*tri)
+        if dx<70 and dy<70:
+            if angle>90:
+                dx,dy=dy,dx
+                obtuse+=1
+            if angle:
+                angs.append(angle)
+                distinct+=1
+            ys.append(dy)
+            xs.append(dx)
+            zs.append(_coord_in_miles(tri[1],tri[2]))
+    logging.info("read %d triangles",len(ys))
+    print obtuse,distinct
     fig = plt.figure(figsize=(18,18))
-    ax = fig.add_subplot(111)
-    cmap = LinearSegmentedColormap.from_list("gray_map",["#c0c0c0","k"])
-    ax.hexbin(mins,maxs,
-            gridsize=500,
-            bins="log",
-            cmap=cmap,
-            mincnt=1,
-            linewidth=.0001,
+    ax = fig.add_subplot(223)
+    ax.plot(xs,ys,',',
+            color='k',
+            alpha=.1,
+            markersize=10,
             )
+    for arr,spot in ((xs,221),(ys,224)):
+        ah = fig.add_subplot(spot)
+        ah.hist(arr,140,cumulative=True)
+        ah.set_xlim(0,70)
+        ah.set_ylim(0,50000)
+    ah = fig.add_subplot(222)
+    ah.hist(angs,90)
+    ah.set_xlim(0,180)
+    ah.set_ylim(0,1000)
     fig.savefig('../www/'+out_path)
 
-
 def rfriends():
-    db = connect('houtx_edges')
-    edges = db.paged_view('_all_docs',include_docs=True)
+    Model.database = connect('houtx_edges')
+    edges = Model.database.paged_view('_all_docs',include_docs=True)
     clowns = 0
     nobodys = 0
     for row in edges:
@@ -359,18 +418,3 @@ def rfriends():
         print " ".join([d['_id']]+list(rfs))
     logging.info("clowns: %d",clowns)
     logging.info("nobodys: %d",nobodys)
-
-if __name__ == '__main__' and len(sys.argv)>1:
-    try:
-        opts, args = getopt.getopt(sys.argv[2:], "c:")
-    except getopt.GetoptError, err:
-        print str(err)
-        print "usage: ./peek.py function_name [-c database] [arguments]"
-        sys.exit(2)
-    for o, a in opts:
-        if o == "-c":
-            db = connect(a)
-            Model.database = db
-        else:
-            assert False, "unhandled option"
-    locals()[sys.argv[1]](*args)

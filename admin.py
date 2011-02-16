@@ -8,37 +8,16 @@ import itertools
 import time
 import logging
 import heapq
-import sys
 import getopt
-from collections import defaultdict
 from datetime import datetime as dt
 
 from couchdbkit import ResourceNotFound, BulkSaveError
 import restkit.errors
 from couchdbkit.loaders import FileSystemDocsLoader
-import beanstalkc
 
 from settings import settings
-import twitter
-from models import *
-from gisgraphy import GisgraphyResource
 from scoredict import Scores, BUCKETS, log_score, DONE
 import lookup
-
-gisgraphy = GisgraphyResource()
-db = CouchDB(settings.couchdb_root+settings.region,True)
-twitter = twitter.TwitterResource()
-Model.database = db
-logging.basicConfig(level=logging.INFO)
-
-try:
-    stalk = beanstalkc.Connection()
-except:
-    pass
-
-
-def connect(name):
-    return CouchDB(settings.couchdb_root+name,True)
 
 
 def grouper(n, iterable, fillvalue=None):
@@ -50,7 +29,7 @@ def grouper(n, iterable, fillvalue=None):
 def design_sync(type):
     "sync the documents in _design"
     loader = FileSystemDocsLoader(type+'_design')
-    loader.sync(db, verbose=True)
+    loader.sync(Model.database, verbose=True)
 
 
 def stop_lookup():
@@ -61,7 +40,7 @@ def stop_lookup():
 def import_json():
     for g in grouper(1000,sys.stdin):
         try:
-            db.bulk_save([json.loads(l) for l in g if l])
+            Model.database.bulk_save([json.loads(l) for l in g if l])
         except BulkSaveError as err:
             if any(d['error']!='conflict' for d in err.errors):
                 raise
@@ -80,13 +59,28 @@ def import_old_json():
             for field in ['ats','fols','frs']:
                 if field in d and isinstance(d[field],list):
                     d[field] = [u[1:] for u in d[field]]
-        db.bulk_save(docs)
+        Model.database.bulk_save(docs)
 
 
 def export_json(start=None,end=None):
-    for d in db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
-        del d['doc']['_rev']
-        print json.dumps(d['doc'])
+    for d in Model.database.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end):
+        if d['id'][0]!='_':
+            del d['doc']['_rev']
+            print json.dumps(d['doc'])
+ 
+
+def export_mongo():
+    for d in Model.database.paged_view('_all_docs',include_docs=True):
+        if d['id'][0]!='_':
+            d = d['doc']
+            del d['_rev']
+            for k,v in d.iteritems():
+                if k[-2:]=='id' or k in ('rtt','rtu'):
+                    d[k]=int(v)
+            for field in ['ats','fols','frs']:
+                if field in d and isinstance(d[field],list):
+                    d[field] = [int(u) for u in d[field][:5000]]
+            print json.dumps(d)
 
 
 def merge_db(*names,**kwargs):
@@ -119,7 +113,7 @@ def fake_lu_master():
 def fake_lu_slave():
     proc = lookup.LookupSlave('y')
     Edges.database = CouchDB('http://127.0.0.1:5984/orig_houtx',True)
-    view = db.paged_view('dev/user_and_tweets',include_docs=True)
+    view = Model.database.paged_view('dev/user_and_tweets',include_docs=True)
     for k,g in itertools.groupby(view, lambda r:r['key'][0]):
         user_d = g.next()
         if user_d['id'][0] != 'U':
@@ -178,7 +172,7 @@ def force_lookup(to_db="hou",start_id='',end_id=None):
     "Lookup users who were not included in the original crawl."
     start ='U'+start_id
     end = 'U'+end_id if end_id else 'V'
-    user_view = db.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
+    user_view = Model.database.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
     users = (User(d['doc']) for d in user_view)
     Model.database = connect(to_db)
     found_db = connect("houtx")
@@ -267,24 +261,3 @@ def sleep_if_needed():
         delta = (twitter.reset_time-dt.utcnow())
         logging.info("goodnight for %r",delta)
         time.sleep(delta.seconds)
-
-
-if __name__ == '__main__' and len(sys.argv)>1:
-    try:
-        opts, args = getopt.getopt(sys.argv[2:], "c:s:e:")
-    except getopt.GetoptError, err:
-        print str(err)
-        print "usage: ./admin.py function_name [-c database] [-s startkey] [-e endkey] [arguments]"
-        sys.exit(2)
-    kwargs={}
-    for o, a in opts:
-        if o == "-c":
-            db = connect(a)
-            Model.database = db
-        elif o == "-s":
-            kwargs['start']=a
-        elif o == "-e":
-            kwargs['end']=a
-        else:
-            assert False, "unhandled option"
-    locals()[sys.argv[1]](*args,**kwargs)

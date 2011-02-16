@@ -116,8 +116,8 @@ class Tweet(TwitterModel):
 class Edges(TwitterModel):
     # I only store the first 5000 friends and followers
     _id = TwitterIdProperty('_id')
-    friends = SlugListProperty('frs')
-    followers = SlugListProperty('fols')
+    friends = ListProperty('frs',int)
+    followers = ListProperty('fols',int)
     
     @classmethod
     def get_for_user_id(cls, _id):
