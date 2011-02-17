@@ -8,21 +8,6 @@ from maroon import *
 
 from settings import settings
 
-def as_local_id(prefix,id):
-    raise NotImplementedError
-
-def _as_local_id(prefix,id):
-    return "%c%d"%(prefix,id)
-
-def as_int_id(prefix,id):
-    raise NotImplementedError
-
-def _as_int_id(id):
-    try:
-        return int(id)
-    except ValueError:
-        return int(id[1:])
-
 
 class TwitterModel(Model):
     def __init__(self, from_dict=None, **kwargs):
@@ -36,12 +21,8 @@ class TwitterModel(Model):
         except ResourceConflict:
             logging.warn("conflict on %s %s",self.__class__.__name__,self._id)
 
-class TwitterIdProperty(TextProperty):
-    def __init__(self, name, **kwargs):
-        TextProperty.__init__(self, name, **kwargs)
-
-    def validated(self, val):
-        return Property.validated(self, str(val))
+class TwitterIdProperty(IntProperty):
+    pass
 
 class TwitterDateTimeProperty(DateTimeProperty):
     def  __init__(self, name, **kwargs):
@@ -91,7 +72,7 @@ class User(TwitterModel):
 
 class Tweet(TwitterModel):
     _id = TwitterIdProperty('_id')
-    mentions = SlugListProperty('ats') #based on entities
+    mentions = ListProperty('ats',int) #based on entities
 
     #properties from twitter
     coordinates = Property('coord')
@@ -110,7 +91,7 @@ class Tweet(TwitterModel):
             self.user_id = from_dict['user']['id']
         if self.mentions is None and 'entities' in from_dict:
             ats = from_dict['entities']['user_mentions']
-            self.mentions = [ str(at['id']) for at in ats ]
+            self.mentions = [at['id'] for at in ats ]
 
 
 class Edges(TwitterModel):

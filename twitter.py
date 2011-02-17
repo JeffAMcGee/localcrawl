@@ -70,7 +70,7 @@ class TwitterResource(Resource):
             cursor=-1,
             **kwargs
         )
-        return (str(id) for id in ids['ids'])
+        return ids['ids']
 
     def user_lookup(self, user_ids=[], screen_names=[], **kwargs):
         ids = ','.join(str(u) for u in user_ids)

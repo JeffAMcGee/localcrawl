@@ -10,6 +10,7 @@ settings = SettingsBunch(
     local_box = dict(lat=(29,30.5),lng=(-96,-94.5)),
     region = "houtx",
     slaves = 12,
+    db = "mongo",
     gisgraphy_url = "http://services.gisgraphy.com",
     beanstalk_host = 'localhost',
     beanstalk_port = 11300,
@@ -27,7 +28,7 @@ settings = SettingsBunch(
     tweets_per_crawl = 20,
     max_hours = 100,
     pdb = pdb.set_trace,
-    min_tweet_id = 'T27882000000',
+    min_tweet_id = 25000000000000000,
 )
 
 try:

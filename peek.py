@@ -164,7 +164,7 @@ def count_recent():
             if user_d['id'][0] != 'U':
                 print "fail %r"%user_d
                 continue
-            tweets = sum(1 for r in g if as_int_id(r['id'])>min_int_id)
+            tweets = sum(1 for r in g if int(r['id'])>min_int_id)
             print "%d\t%s"%(tweets,user_d['id'])
          
 
@@ -212,7 +212,7 @@ def analyze():
     for user in all_users():
         if user['doc'].get('utco')!=-21600:
             continue
-        state, rfs, ats = scores.split(as_int_id(user['id']))
+        state, rfs, ats = scores.split(int(user['id']))
         if user['id'] in local_users:
             loc = 1
         else:

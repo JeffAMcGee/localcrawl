@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from collections import defaultdict
 import beanstalkc
 import json
@@ -12,10 +13,10 @@ import sys
 import maroon
 from maroon import *
 
-from models import Edges, User, Tweet, LookupJobBody, as_local_id, as_int_id
+from models import Edges, User, Tweet, LookupJobBody
 from twitter import TwitterResource
 from settings import settings
-from gisgraphy import GisgraphyResource
+from gisgraphy import GisgraphyResource, in_local_box
 from procs import LocalProc, create_slaves
 from scoredict import Scores, log_score, BUCKETS
 import scoredict
@@ -39,22 +40,24 @@ class LookupMaster(LocalProc):
         logging.info("started lookup")
         try:
             while not self.halt:
-                ready = self.stalk.stats_tube(self.stalk.using())['current-jobs-ready']
+                tube = self.stalk.using()
+                ready = self.stalk.stats_tube(tube)['current-jobs-ready']
                 logging.info("ready is %d",ready)
                 if ready<1000:
                     cutoff = self.calc_cutoff()
 
-                    if cutoff==0:
+                    if cutoff<settings.min_cutoff and self.lookups>100:
                         self.halt=True
                         print "halt because cutoff is 0"
                         break
                     logging.info("pick_users with score %d", cutoff)
-                    self.pick_users(max(settings.min_cutoff,cutoff))
+                    self.pick_users(cutoff)
                     print "scores:%d lookups:%d"%(len(self.scores),self.lookups)
 
                 logging.info("read_scores")
                 self.read_scores()
         except:
+            pdb.post_mortem()
             logging.exception("exception caused HALT")
         self.read_scores()
         self.scores.dump(settings.lookup_out)
@@ -65,7 +68,7 @@ class LookupMaster(LocalProc):
         stop = 10000000 if self.halt else 100000
         for x in xrange(stop):
             try:
-                job = self.stalk.reserve(120)
+                job = self.stalk.reserve(35)
                 if job is None:
                     logging.info("loaded %d scores",x)
                     return
@@ -77,15 +80,16 @@ class LookupMaster(LocalProc):
                     return
                 body = LookupJobBody.from_job(job)
                 if body.done:
-                    self.scores.set_state(as_int_id(body._id), scoredict.DONE)
+                    self.scores.set_state(body._id, scoredict.DONE)
                 else:
                     self.scores.increment(
-                        as_int_id(body._id),
+                        body._id,
                         body.rfriends_score,
                         body.mention_score
                     )
                 job.delete()
             except:
+                pdb.post_mortem()
                 logging.exception("exception in read_scores caused HALT")
                 self.halt = True
                 if job:
@@ -112,7 +116,7 @@ class LookupMaster(LocalProc):
             state, rfs, ats = self.scores.split(uid)
             if state==scoredict.NEW and log_score(rfs,ats) >= cutoff:
                 job = LookupJobBody(
-                    _id=as_local_id('U',uid),
+                    _id=uid,
                     rfriends_score=rfs,
                     mention_score=ats,
                 )
@@ -128,7 +132,7 @@ def guess_location(user, gisgraphy):
     if not place:
         return .5
     user.geonames_place = place
-    return 1 if gisgraphy.in_local_box(place.to_d()) else 0
+    return 1 if in_local_box(place.to_d()) else 0
 
 
 class LookupSlave(LocalProc):
@@ -136,12 +140,12 @@ class LookupSlave(LocalProc):
         LocalProc.__init__(self,'lookup',slave_id)
         self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
-        self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
+        #self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def run(self):
         while True:
             jobs = []
-            for x in xrange(20):
+            for x in xrange(100):
                 # reserve blocks to wait when x is 0, but returns None for 1-19
                 try:
                     j = self.stalk.reserve(0 if x else None)
@@ -163,13 +167,14 @@ class LookupSlave(LocalProc):
                         logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
                     logging.info("look at %s",user.screen_name)
-                    if user._id in User.database or user._id in self.orig_db:
+                    if User.in_db(user._id):
                         job.delete()
                         continue
                     self.crawl_user(user)
                     user.save()
                     job.delete()
                 except:
+                    pdb.post_mortem()
                     logging.exception("exception for job %s"%job.body)
                     job.bury()
             logging.info("api calls remaining: %d",self.twitter.remaining)
@@ -181,7 +186,7 @@ class LookupSlave(LocalProc):
         rels=None
         tweets=None
         if user.followers_count>0 and user.friends_count>0:
-            rels = self.twitter.get_relationships(user._id)
+            rels = self.twitter.get_edges(user._id)
             rels.attempt_save()
 
         if user.statuses_count>0:

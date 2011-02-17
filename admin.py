@@ -1,14 +1,8 @@
-#!/usr/bin/env python
-# This is a tool for testing and administrative tasks.  It is designed to
-# be %run in ipython.  If you import it from another module, you're doing
-# something wrong.
-
 import json
 import itertools
 import time
 import logging
 import heapq
-import getopt
 from datetime import datetime as dt
 
 from couchdbkit import ResourceNotFound, BulkSaveError
@@ -182,7 +176,7 @@ def force_lookup(to_db="hou",start_id='',end_id=None):
     scores.read(settings.lookup_out)
     region = ("Texas","United States")
     for user in users:
-        int_uid = as_int_id(user._id)
+        int_uid = int(user._id)
         if (    user.lookup_done or
                 user.protected or
                 int_uid not in scores or
