@@ -24,8 +24,8 @@ settings = SettingsBunch(
     log_dir = 'logs',
     beanstalkd_ttr = 3600,
     tweets_per_hour = .04, # 1 tweet/day is median
-    tweets_per_crawl = 20,
-    max_hours = 100,
+    tweets_per_crawl = 200,
+    max_hours = 360, # 15 days
     pdb = pdb.set_trace,
     min_tweet_id = 'T27882000000',
 )

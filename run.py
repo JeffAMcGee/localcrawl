@@ -19,16 +19,11 @@ import twitter
 from gisgraphy import GisgraphyResource
 from maroon import *
 from models import *
+from utils import *
 from admin import *
 from peek import *
 
 logging.basicConfig(level=logging.INFO)
-
-def couch(name):
-    return CouchDB(settings.couchdb_root+name,True)
-
-def mongo(name):
-    return MongoDB(name=name)
 
 if len(sys.argv)>1:
     try:
@@ -49,8 +44,6 @@ if len(sys.argv)>1:
             kwargs['end']=a
         else:
             assert False, "unhandled option"
-    if not Model.__dict__.get('database'):
-        Model.database = mongo(settings.region)
     locals()[sys.argv[1]](*args,**kwargs)
 else:
     gisgraphy = GisgraphyResource()

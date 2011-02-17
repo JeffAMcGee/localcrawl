@@ -24,7 +24,6 @@ import numpy
 from couchdbkit import ResourceNotFound
 
 from settings import settings
-from gisgraphy import in_local_box
 import twitter
 from models import *
 from maroon import ModelCache
@@ -272,16 +271,19 @@ def count_friends(users_path="hou_tri_users"):
     users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
     uids = set(users)
     logging.info("looking at %d users",len(users))
-    counts = []
+    fols = []
+    frds = []
     for u in users:
         obj = Edges.get_id(int(u))
         if obj._id==None:
             continue
-        counts.append(len(uids.intersection(obj.friends)))
+        frds.append(len(uids.intersection(obj.friends)))
+        fols.append(len(uids.intersection(obj.followers)))
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.hist(counts,bins=range(100))
-    fig.savefig('../www/fr_hist.png')
+    ax.hist(fols,bins=range(100),histtype='step')
+    ax.hist(frds,bins=range(100),histtype='step')
+    fig.savefig('../www/fol_hist.png')
 
 
 def edge_dist(users_path="hou_tri_users"):

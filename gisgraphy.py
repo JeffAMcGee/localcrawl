@@ -6,7 +6,7 @@ from restkit.errors import RequestFailed
 
 from settings import settings
 from models import GeonamesPlace
-
+from utils import in_local_box
 
 class GisgraphyResource(Resource):
     COORD_RE = re.compile('(-?\d+\.\d+), *(-?\d+\.\d+)')
@@ -60,11 +60,6 @@ class GisgraphyResource(Resource):
                     if res:
                         found = res
         return found
-
-
-def in_local_box(place):
-    box = settings.local_box
-    return all(box[d][0]<place[d]<box[d][1] for d in ('lat','lng'))
 
 
 if __name__ == '__main__':
