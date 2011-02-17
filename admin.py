@@ -12,13 +12,9 @@ from couchdbkit.loaders import FileSystemDocsLoader
 from settings import settings
 from scoredict import Scores, BUCKETS, log_score, DONE
 import lookup
-
-
-def grouper(n, iterable, fillvalue=None):
-    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
-    args = [iter(iterable)] * n
-    return itertools.izip_longest(*args, fillvalue=fillvalue)
-
+import twitter
+from models import *
+from utils import grouper, couch, mongo
 
 def design_sync(type):
     "sync the documents in _design"
@@ -249,7 +245,22 @@ def user_lookup(user):
     sleep_if_needed()
 
 
-def sleep_if_needed():
+
+def fill_50():
+    settings.pdb()
+    Tweet.database = couch('hou_new_tweet')
+    old_db = couch('houtx_tweet')
+    res = twitter.TwitterResource()
+    for line in open('logs/missing_uids'):
+        uid = line.strip()
+        view = old_db.paged_view('tweet/uid',key=uid)
+        last = max(int(row['id']) for row in view)
+        tweets = res.save_timeline(uid, last_tid=last)
+        logging.info("saved %d for %s",len(tweets),uid)
+        sleep_if_needed(res)
+
+
+def sleep_if_needed(twitter):
     logging.info("api calls remaining: %d",twitter.remaining)
     if twitter.remaining < 10:
         delta = (twitter.reset_time-dt.utcnow())
