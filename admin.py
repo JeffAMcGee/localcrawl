@@ -2,6 +2,7 @@ import json
 import itertools
 import time
 import logging
+import sys
 import heapq
 from datetime import datetime as dt
 
@@ -14,7 +15,7 @@ from scoredict import Scores, BUCKETS, log_score, DONE
 import lookup
 import twitter
 from models import *
-from utils import grouper, couch, mongo
+from utils import grouper, couch, mongo, in_local_box
 
 def design_sync(type):
     "sync the documents in _design"
@@ -71,6 +72,17 @@ def export_mongo():
                 if field in d and isinstance(d[field],list):
                     d[field] = [int(u) for u in d[field][:5000]]
             print json.dumps(d)
+
+
+def pick_locals(path=None):
+    file =open(path) if path else sys.stdin 
+    for line in file:
+        tweet = json.loads(line)
+        if not tweet.get('coordinates'):
+            continue
+        d = dict(zip(['lng','lat'],tweet['coordinates']['coordinates']))
+        if in_local_box(d):
+            print json.dumps(tweet['user'])
 
 
 def merge_db(*names,**kwargs):
