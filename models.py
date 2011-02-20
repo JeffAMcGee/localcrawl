@@ -122,4 +122,4 @@ class LookupJobBody(JobBody):
     rfriends_score = IntProperty('rfs')
     mention_score = IntProperty('ats')
     done = BoolProperty('done')
-    force = BoolProperty('force')
+    force = BoolProperty('f')

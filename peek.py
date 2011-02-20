@@ -205,7 +205,7 @@ def analyze():
         for score in xrange(BUCKETS))
 
     for user in User.get_all():
-        #if user['doc'].get('utco')!=-21600: continue
+        if user.utc_offset==7200: continue
         state, rfs, ats = scores.split(user._id)
 
         for weight in weights:

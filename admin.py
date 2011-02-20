@@ -179,37 +179,6 @@ def merge_views(*views):
             return
 
 
-def force_lookup(to_db="hou",start_id='',end_id=None):
-    "Lookup users who were not included in the original crawl."
-    start ='U'+start_id
-    end = 'U'+end_id if end_id else 'V'
-    user_view = Model.database.paged_view('_all_docs',include_docs=True,startkey=start,endkey=end)
-    users = (User(d['doc']) for d in user_view)
-    Model.database = connect(to_db)
-    found_db = connect("houtx")
-    found_view = found_db.paged_view('_all_docs',startkey=start,endkey=end)
-    found = set(d['id'] for d in found_view)
-    scores = Scores()
-    scores.read(settings.lookup_out)
-    region = ("Texas","United States")
-    for user in users:
-        int_uid = int(user._id)
-        if (    user.lookup_done or
-                user.protected or
-                int_uid not in scores or
-                user.local_prob==1 or
-                (user.local_prob==0 and user.geonames_place.name not in region) or
-                user._id in found
-           ):
-            continue
-        state, rfs, ats = scores.split(int_uid)
-        if user.utc_offset == -21600:
-            if log_score(rfs,ats,.9) < 1: continue
-        else:
-            if log_score(rfs,ats) < settings.non_local_cutoff: continue
-        user_lookup(user)
-
-
 def _users_from_scores():
     scores = Scores()
     scores.read(settings.lookup_out)

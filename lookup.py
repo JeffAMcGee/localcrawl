@@ -56,6 +56,10 @@ class LookupMaster(LocalProc):
                     if old_lookups == self.lookups:
                         print "halt because no new lookups"
                         self.halt=True
+                        settings.pdb()
+                        #self.read_scores()
+                        self.force_lookup()
+
                 logging.info("read_scores")
                 self.read_scores()
         except:
@@ -116,14 +120,38 @@ class LookupMaster(LocalProc):
         for uid in self.scores:
             state, rfs, ats = self.scores.split(uid)
             if state==scoredict.NEW and log_score(rfs,ats) >= cutoff:
-                job = LookupJobBody(
-                    _id=uid,
-                    rfriends_score=rfs,
-                    mention_score=ats,
-                )
-                job.put(self.stalk)
-                self.scores.set_state(uid, scoredict.LOOKUP)
+                self._send_job(uid,rfs,ats)
                 self.lookups+=1
+
+    def _send_job(self, uid, rfs, ats, force=None):
+        job = LookupJobBody(
+            _id=uid,
+            rfriends_score=rfs,
+            mention_score=ats,
+            force=force
+        )
+        job.put(self.stalk)
+        self.scores.set_state(uid, scoredict.LOOKUP)
+
+    def force_lookup(self):
+        "Lookup users who were not included in the original crawl."
+        for user in User.get_all():
+            if (    user.lookup_done or
+                    user.protected or
+                    user._id not in self.scores or
+                    user.local_prob==1
+               ):
+                continue
+
+            state, rfs, ats = self.scores.split(user._id)
+            reasons = [
+                user.utc_offset == settings.utc_offset,
+                log_score(rfs,ats) >= settings.non_local_cutoff,
+                user.local_prob == .5,
+            ]
+            if sum(reasons)>=2:
+                logging.info("force %s - %d for %r", user.screen_name, user._id, reasons)
+                self._send_job(user._id,rfs,ats,True)
 
 
 def guess_location(user, gisgraphy):
@@ -141,14 +169,13 @@ class LookupSlave(LocalProc):
         LocalProc.__init__(self,'lookup',slave_id)
         self.twitter = TwitterResource()
         self.gisgraphy = GisgraphyResource()
-        #self.orig_db = CouchDB(settings.couchdb_root+"orig_houtx")
 
     def run(self):
         while True:
             jobs = []
             for x in xrange(100):
-                # reserve blocks to wait when x is 0, but returns None for 1-19
                 try:
+                    # reserve blocks to wait when x is 0, but returns None for 1-99
                     j = self.stalk.reserve(0 if x else None)
                 except beanstalkc.DeadlineSoon:
                     break
@@ -164,6 +191,7 @@ class LookupSlave(LocalProc):
                 continue
 
             logging.info("looking at %r"%[getattr(u,'screen_name','') for u in users])
+            settings.pdb()
             for job,body,user in zip(jobs,bodies,users):
                 if user is None:
                     logging.info("no profile for %d",body._id)
@@ -175,10 +203,10 @@ class LookupSlave(LocalProc):
                         logging.info("goodnight for %r",dt)
                         time.sleep(dt.seconds)
                     logging.info("look at %s",user.screen_name)
-                    if User.in_db(user._id):
+                    if (not body.force) and User.in_db(user._id):
                         job.delete()
                         continue
-                    self.crawl_user(user)
+                    self.crawl_user(user,body.force)
                     user.save()
                     job.delete()
                 except:
@@ -186,9 +214,9 @@ class LookupSlave(LocalProc):
                     job.bury()
             logging.info("api calls remaining: %d",self.twitter.remaining)
 
-    def crawl_user(self,user):
+    def crawl_user(self,user,force):
         user.local_prob = guess_location(user,self.gisgraphy)
-        if user.local_prob != 1.0 or user.protected:
+        if (user.local_prob != 1.0 and not force) or user.protected:
             return
         rels=None
         tweets=None
@@ -205,7 +233,7 @@ class LookupSlave(LocalProc):
             user.last_tid = tweets[0]._id
         
         user.lookup_done = True
-        if user.local_prob == 1.0:
+        if user.local_prob == 1.0 and not force:
             self.score_new_users(user, rels, tweets)
 
     def score_new_users(self, user, rels, tweets):
