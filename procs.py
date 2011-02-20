@@ -6,6 +6,7 @@ import logging
 from multiprocessing import Process
 
 from settings import settings
+from maroon import CouchDB, MongoDB, TeeDB
 from models import *
 
 
@@ -18,15 +19,15 @@ class LocalProc(object):
         label = settings.region+"_"+task
         self.stalk.watch(label if slave_id else label+"_done")
         self.stalk.use(label+"_done" if slave_id else label)
+
+        log = label+"_"+slave_id if slave_id else label
+        filepath = os.path.join(settings.log_dir, log)
+        logging.basicConfig(filename=filepath+".log",level=logging.INFO)
         
         if settings.db == 'couch':
             Model.database = CouchDB(settings.couchdb_root+settings.region,True)
         else:
-            Model.database = MongoDB(name=settings.region)
-
-        log = label+"_"+slave_id if slave_id else label
-        filepath = os.path.join(settings.log_dir, log)
-        logging.basicConfig(filename=filepath,level=logging.INFO)
+            Model.database = TeeDB(filepath+".json",MongoDB(name=settings.region))
 
 
 def _run_slave(Proc,slave_id,*args):

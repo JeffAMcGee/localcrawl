@@ -193,11 +193,8 @@ def analyze():
     "Find out how the scoring algorithm did."
     scores = Scores()
     scores.read(settings.lookup_out)
-    local_db = CouchDB('http://127.0.0.1:5984/hou',True)
-    local_view = local_db.paged_view('_all_docs',startkey='U',endkey='V')
-    local_users = set(r['id'] for r in local_view)
 
-    locs = (-1,0,.5,1)
+    locs = (0,.5,1)
     weights =(.1,.3,.5,.7,.9)
     counts = dict(
         (score, dict(
@@ -206,25 +203,16 @@ def analyze():
                 for weight in weights))
             for loc in locs))
         for score in xrange(BUCKETS))
-    
 
-    for user in all_users():
-        if user['doc'].get('utco')!=-21600:
-            continue
-        state, rfs, ats = scores.split(int(user['id']))
-        if user['id'] in local_users:
-            loc = 1
-        else:
-            try:
-                loc = .5 if user['doc']['prob']==.5 else 0
-            except ResourceNotFound:
-                loc = -1
+    for user in User.get_all():
+        #if user['doc'].get('utco')!=-21600: continue
+        state, rfs, ats = scores.split(user._id)
 
         for weight in weights:
             score = log_score(rfs,ats,weight)
-            counts[score][loc][weight]+=1
+            counts[score][user.local_prob][weight]+=1
 
-    print "todo\t\t\t\t\tnon\t\t\t\t\tunk\t\t\t\t\tlocal"
+    print "non\t\t\t\t\tunk\t\t\t\t\tlocal"
     for score in xrange(BUCKETS):
         for loc in locs:
             for weight in weights:

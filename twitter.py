@@ -86,7 +86,7 @@ class TwitterResource(Resource):
             return users
         # Ick. Twitter just removes suspended users from the results.
         d = dict((u._id,u) for u in users)
-        return [d.get(str(uid),None) for uid in user_ids]
+        return [d.get(uid,None) for uid in user_ids]
 
     def friends_ids(self, user_id):
         return self.get_ids("friends/ids.json", user_id)
@@ -141,7 +141,7 @@ class TwitterResource(Resource):
                 logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
                 break
         try:
-            Tweet.database.bulk_save_models(t for t in all_tweets if int(t._id)-1>since_id)
+            Tweet.database.bulk_save_models([t for t in all_tweets if int(t._id)-1>since_id])
         except BulkSaveError as err:
             #ignore conflicts
             if any(d['error']!='conflict' for d in err.errors):

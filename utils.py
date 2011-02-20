@@ -19,3 +19,9 @@ def mongo(name):
 def in_local_box(place):
     box = settings.local_box
     return all(box[d][0]<place[d]<box[d][1] for d in ('lat','lng'))
+
+
+def peek(iterable):
+    it = iter(iterable)
+    first = it.next()
+    return first, itertools.chain([first],it)

@@ -12,6 +12,7 @@ import sys
 
 import maroon
 from maroon import *
+from restkit import ResourceNotFound
 
 from models import Edges, User, Tweet, LookupJobBody
 from twitter import TwitterResource
@@ -45,19 +46,19 @@ class LookupMaster(LocalProc):
                 logging.info("ready is %d",ready)
                 if ready<1000:
                     cutoff = self.calc_cutoff()
+                    old_lookups = self.lookups
 
                     if cutoff<settings.min_cutoff and self.lookups>100:
-                        self.halt=True
-                        print "halt because cutoff is 0"
-                        break
-                    logging.info("pick_users with score %d", cutoff)
-                    self.pick_users(cutoff)
+                        self.pick_users(settings.min_cutoff)
+                    else:
+                        self.pick_users(cutoff)
                     print "scores:%d lookups:%d"%(len(self.scores),self.lookups)
-
+                    if old_lookups == self.lookups:
+                        print "halt because no new lookups"
+                        self.halt=True
                 logging.info("read_scores")
                 self.read_scores()
         except:
-            pdb.post_mortem()
             logging.exception("exception caused HALT")
         self.read_scores()
         self.scores.dump(settings.lookup_out)
@@ -89,7 +90,6 @@ class LookupMaster(LocalProc):
                     )
                 job.delete()
             except:
-                pdb.post_mortem()
                 logging.exception("exception in read_scores caused HALT")
                 self.halt = True
                 if job:
@@ -112,6 +112,7 @@ class LookupMaster(LocalProc):
         return 0
 
     def pick_users(self, cutoff):
+        logging.info("pick_users with score %d", cutoff)
         for uid in self.scores:
             state, rfs, ats = self.scores.split(uid)
             if state==scoredict.NEW and log_score(rfs,ats) >= cutoff:
@@ -156,11 +157,18 @@ class LookupSlave(LocalProc):
                 jobs.append(j)
 
             bodies = [LookupJobBody.from_job(j) for j in jobs]
-            users =self.twitter.user_lookup([b._id for b in bodies])
+            try:
+                users =self.twitter.user_lookup([b._id for b in bodies])
+            except ResourceNotFound:
+                logging.info("no profile for %r",[b._id for b in bodies])
+                continue
 
             logging.info("looking at %r"%[getattr(u,'screen_name','') for u in users])
             for job,body,user in zip(jobs,bodies,users):
-                if user is None: continue
+                if user is None:
+                    logging.info("no profile for %d",body._id)
+                    job.delete()
+                    continue
                 try:
                     if self.twitter.remaining < 30:
                         dt = (self.twitter.reset_time-datetime.utcnow())
@@ -174,7 +182,6 @@ class LookupSlave(LocalProc):
                     user.save()
                     job.delete()
                 except:
-                    pdb.post_mortem()
                     logging.exception("exception for job %s"%job.body)
                     job.bury()
             logging.info("api calls remaining: %d",self.twitter.remaining)
@@ -190,9 +197,7 @@ class LookupSlave(LocalProc):
             rels.attempt_save()
 
         if user.statuses_count>0:
-            tweets = self.twitter.user_timeline(user._id,since_id=settings.min_tweet_id)
-            for tweet in tweets:
-                tweet.attempt_save()
+            tweets = self.twitter.save_timeline(user._id,last_tid=settings.min_tweet_id)
         if tweets:
             user.next_crawl_date = datetime.utcnow()
             user.last_crawl_date = datetime.utcnow()

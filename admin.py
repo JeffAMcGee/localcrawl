@@ -9,6 +9,7 @@ from datetime import datetime as dt
 from couchdbkit import ResourceNotFound, BulkSaveError
 import restkit.errors
 from couchdbkit.loaders import FileSystemDocsLoader
+import beanstalkc
 
 from settings import settings
 from scoredict import Scores, BUCKETS, log_score, DONE
@@ -24,8 +25,16 @@ def design_sync(type):
 
 
 def stop_lookup():
+    stalk = beanstalkc.Connection()
     stalk.use(settings.region+"_lookup_done")
     stalk.put('halt',0)
+
+
+def kick_all():
+    stalk = beanstalkc.Connection()
+    tube = settings.region+"_lookup"
+    stalk.use(tube)
+    stalk.kick(stalk.stats_tube(tube)['current-jobs-buried'])
 
 
 def import_json():
