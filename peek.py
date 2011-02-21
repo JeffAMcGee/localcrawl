@@ -267,6 +267,35 @@ def _triangle_set(strict=True):
         yield user
 
 
+def graph_edges(users_path="hou_tri_users"):
+    users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
+    uids = set(users)
+    counts = dict(non=[],frd=[],fol=[],rfrd=[])
+    for u in users:
+        obj = Edges.get_id(int(u))
+        if not (obj.friends and obj.followers): continue
+        sets = dict(
+            frd = uids.intersection(obj.friends),
+            fol = uids.intersection(obj.followers),
+            )
+        sets['rfrd'] = sets['frd'] & sets['fol']
+        sets['non'] = uids.difference(sets['frd'] | sets['fol'])
+        rfriends = len(sets['rfrd'])
+        if not rfriends: continue
+        for k,v in sets.iteritems():
+            others = random.sample(v,1)
+            dists = [_coord_in_miles(users[u],users[other]) for other in others]
+            counts[k].extend(dists)
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    for k,v in counts.iteritems():
+        ax.hist(v,bins=range(100),histtype='step',label=k,cumulative=True)
+    ax.set_ylim(0,10200)
+    print len(counts['rfrd'])
+    ax.legend()
+    fig.savefig('../www/edges.png')
+
+
 def count_friends(users_path="hou_tri_users"):
     users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
     uids = set(users)

@@ -19,9 +19,9 @@ import twitter
 from gisgraphy import GisgraphyResource
 from maroon import *
 from models import *
-from utils import *
 from admin import *
 from peek import *
+from utils import *
 
 logging.basicConfig(level=logging.INFO)
 
