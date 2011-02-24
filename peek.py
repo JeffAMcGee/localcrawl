@@ -366,6 +366,31 @@ def split_tri_counts(counts_path):
     third = len(edges)/3
     return (edges[:third],edges[2*third:3*third])
 
+def graph_thickness(counts_path="tri_counts"):
+    far = 1
+    fig = plt.figure(figsize=(12,4))
+    ax = fig.add_subplot(111)
+    labels = ['mfrd','mfol','yfrd','yfol']
+    edges = split_tri_counts(counts_path)[far]
+    friends = []
+    lines = []
+    for d in edges:
+        sets = [set(d[k]) for k in labels]
+        frs = len(reduce(set.union,sets))
+        if not frs: continue
+        friends.append(frs)
+        lines.append(.5*sum(len(s) for s in sets)/frs-1)
+    ax.plot(friends,lines,'o',
+            color='k',
+            alpha=.01,
+            markersize=13,
+            )
+    ax.set_xlabel('mutual people')
+    ax.set_ylabel('edges')
+    ax.set_ylim(0,1)
+    ax.set_xlim(0,50)
+    fig.savefig('../www/thick_%s.png'%('far' if far else 'near'))
+
 
 def graph_split_counts(counts_path="tri_counts"):
     fig = plt.figure(figsize=(12,12))
@@ -390,33 +415,18 @@ def graph_split_counts(counts_path="tri_counts"):
     ax.legend()
     fig.savefig('../www/split_pairs.png')
 
-def graph_tri_counts(counts_path="tri_counts"):
-    fig = plt.figure(figsize=(12,12))
-    ax = fig.add_subplot(111)
-    labels = ['path','loop','mfan','star']
-    for label in labels:
-        dists = [d['dist'] for d in edges if d[label]]
-        ax.hist(dists,
-            bins=numpy.arange(0,100,.2),
-            histtype='step',
-            normed=True,
-            label=label,
-            cumulative=True,
-            )
-    ax.legend()
-    ax.set_ylim(0,1)
-    fig.savefig('../www/tri_count_min.png')
 
-
-def graph_tri_count_label(counts_path="tri_counts",label='mfan',me='mfrd',you='yfrd'):
-    edges = list(_read_json(counts_path))
+def graph_tri_count_label(counts_path="tri_counts",label='mfan',me='mfol',you='yfol'):
     fig = plt.figure(figsize=(12,12))
     ax = fig.add_subplot(111)
     last_bin=0
-    def count(d):
-        return 1.0*len(set(d[me]).intersection(d[you]))/d['all']
+    dist_ratio = [ 
+        (d['dist'], 1.0*len(set(d[me]).intersection(d[you]))/d['all'])
+        for d in _read_json(counts_path)
+        if d['all'] and not d['rfriend']
+    ]
     for bin in [.2,.4,.6,.8,1]:
-        dists = [d['dist'] for d in edges if d['all'] and last_bin< count(d)<=bin]
+        dists = [d for d,r in dist_ratio if last_bin<r<=bin]
         ax.hist(dists,
             bins=numpy.arange(0,100,.2),
             histtype='step',
@@ -430,7 +440,7 @@ def graph_tri_count_label(counts_path="tri_counts",label='mfan',me='mfrd',you='y
     #ax.set_ylim(0,4000)
     ax.set_xlabel('length of edge in miles')
     ax.set_ylabel('users')
-    fig.savefig('../www/tri_'+label+'_ratio.png')
+    fig.savefig('../www/tri_'+label+'_ratio_nr.png')
 
 
 def bar_graph(counts_path="tri_counts"):
