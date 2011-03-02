@@ -6,6 +6,7 @@
 import itertools
 import time
 import os
+import sys
 import random
 import logging
 import getopt
@@ -96,7 +97,7 @@ def read_locs(path=None):
 
 
 def _read_gis_locs(path=None):
-    for u in _read_tri_users(path or "hou_tri_users"):
+    for u in _read_json(path or "hou_tri_users"):
         yield u['lng'],u['lat']
 
 def _noisy(ray,scale):
@@ -254,10 +255,202 @@ def _triangle_set(strict=True):
             continue
         yield user
 
+def _tri_users_dict_set(users_path):
+    users = dict((int(d['id']),d) for d in _read_json(users_path))
+    return users,set(users)
+
+def graph_edges(users_path="hou_tri_users", ats_path="hou_ats"):
+    users, uids = _tri_users_dict_set(users_path)
+    ats,ated = _parse_ats(ats_path)
+    counts = dict(non=[],frd=[],fol=[],rfrd=[],at=[],ated=[],conv=[])
+    for u in users:
+        obj = Edges.get_id(int(u))
+        if not obj: continue
+        sets = dict(
+            frd = uids.intersection(obj.friends),
+            fol = uids.intersection(obj.followers),
+            )
+        sets['rfrd'] = sets['frd'] & sets['fol']
+        sets['non'] = uids.difference(sets['frd'] | sets['fol'])
+        sets['at'] = ats[int(u)].keys()
+        sets['ated'] = ated[int(u)].keys()
+        sets['conv'] = set(sets['at']).intersection(sets['ated'])
+        rfriends = len(sets['rfrd'])
+        #if not rfriends or not sets['conv']: continue
+        for k,v in sets.iteritems():
+            if not v: continue
+            others = random.sample(v,1)
+            dists = [_coord_in_miles(users[u],users[other]) for other in others]
+            counts[k].extend(dists)
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    for k,v in counts.iteritems():
+        ax.hist(v,
+                bins=numpy.arange(0,100,.2),
+                histtype='step',
+                label=k,
+                #normed=True,
+                cumulative=True)
+    ax.set_ylim(0,15300)
+    print len(counts['rfrd'])
+    ax.legend()
+    ax.set_xlabel('miles between users')
+    ax.set_ylabel('count of users')
+    fig.savefig('../www/edges.png')
+
+
+def find_ats(users_path="hou_tri_users"):
+    users, uids = _tri_users_dict_set(users_path)
+    for line in sys.stdin:
+        d = json.loads(line)
+        if int(d['uid']) in uids and d.get('ats'):
+            for at in d['ats']:
+                if int(at) in uids:
+                    print "%s\t%s"%(d['uid'],at)
+
+def _parse_ats(ats_path):
+    ats =defaultdict(lambda: defaultdict(int))
+    ated =defaultdict(lambda: defaultdict(int))
+    for line in open(ats_path):
+        uid,at = [int(i) for i in line.strip().split('\t')]
+        ats[uid][at]+=1
+        ated[at][uid]+=1
+    return ats,ated
+
+def print_tri_counts(users_path="hou_tri_users"):
+    users, uids = _tri_users_dict_set(users_path)
+    edges = ModelCache(Edges)
+    data = []
+    for uid,user in users.iteritems():
+        me = edges[uid]
+        if not me : continue
+        friends = uids.intersection(me.friends)
+        if not friends: continue
+        your_id = random.sample(friends,1)[0]
+        you = edges[your_id]
+        sets = dict(
+            mfrd = set(me.friends),
+            mfol = set(me.followers),
+            yfrd = set(you.friends),
+            yfol = set(you.followers),
+            )
+        all = (sets['mfrd']|sets['mfol'])&(sets['yfrd']|sets['yfol'])
+        d = dict(
+            dist = _coord_in_miles(user,users[your_id]),
+            all = len(all),
+            rfriend = 1 if your_id in sets['mfol'] else 0 
+        )
+        for k,v in sets.iteritems():
+            d['l'+k]= len(v)
+            d[k] = list(all&v)
+        data.append(d)
+    data.sort(key=itemgetter('dist'))
+    for d in data:
+        print json.dumps(d)
+
+
+def split_tri_counts(counts_path):
+    edges = list(_read_json(counts_path))
+    third = len(edges)/3
+    return (edges[:third],edges[2*third:3*third])
+
+
+def graph_split_counts(counts_path="tri_counts"):
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    bins=[int(2**(x-1)) for x in xrange(10)]
+    for edges,style in zip(split_tri_counts(counts_path),['solid','dotted']):
+        pairs = itertools.product(('mfrd','mfol'),('yfrd','yfol'))
+        #pairs = (('mfrd','yfrd'),('mfol','yfol'))
+        for pair,color in zip(pairs,'rgbk'):
+            counts = [len(set(e[pair[0]])&set(e[pair[1]])) for e in edges]
+            ax.hist(counts,
+                histtype='step',
+                label=','.join(pair),
+                color=color,
+                bins=range(50),
+                linestyle=style,
+                cumulative=True,
+                )
+    ax.set_xlabel('count of users in both sets')
+    ax.set_ylabel('users')
+    ax.set_ylim(0,4000)
+    ax.legend()
+    fig.savefig('../www/split_pairs.png')
+
+def graph_tri_counts(counts_path="tri_counts"):
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    labels = ['path','loop','mfan','star']
+    for label in labels:
+        dists = [d['dist'] for d in edges if d[label]]
+        ax.hist(dists,
+            bins=numpy.arange(0,100,.2),
+            histtype='step',
+            normed=True,
+            label=label,
+            cumulative=True,
+            )
+    ax.legend()
+    ax.set_ylim(0,1)
+    fig.savefig('../www/tri_count_min.png')
+
+
+def graph_tri_count_label(counts_path="tri_counts",label='mfan',me='mfrd',you='yfrd'):
+    edges = list(_read_json(counts_path))
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    last_bin=0
+    def count(d):
+        return 1.0*len(set(d[me]).intersection(d[you]))/d['all']
+    for bin in [.2,.4,.6,.8,1]:
+        dists = [d['dist'] for d in edges if d['all'] and last_bin< count(d)<=bin]
+        ax.hist(dists,
+            bins=numpy.arange(0,100,.2),
+            histtype='step',
+            normed=True,
+            label="%f-%f"%(last_bin,bin),
+            cumulative=True,
+            )
+        last_bin=bin
+    ax.legend()
+    ax.set_ylim(0,1)
+    #ax.set_ylim(0,4000)
+    ax.set_xlabel('length of edge in miles')
+    ax.set_ylabel('users')
+    fig.savefig('../www/tri_'+label+'_ratio.png')
+
+
+def bar_graph(counts_path="tri_counts"):
+    spots = numpy.arange(5)
+    width = .35
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    for e,color in zip(split_tri_counts(counts_path),"rb"):
+        try:
+            r = sum(1 for d in e if d['rfriend'])
+        except:
+            import pdb;
+            pdb.post_mortem()
+        strength = [0]*4
+        for d in e:
+            sets = [set(d[k]) for k in ['mfrd','mfol','yfrd','yfol']]
+            uids = reduce(set.union,sets)
+            if uids:
+                strengths = (sum(u in s for s in sets) for u in uids)
+                strength[max(strengths)-1]+=1
+            else:
+                strength[0]+=1
+        ax.bar(spots,[r]+strength,width,color=color)
+        spots = spots+width
+    ax.set_xticks(spots-width)
+    ax.set_xticklabels(('R','0','2','3','4'))
+    ax.set_ylabel('users')
+    fig.savefig('../www/bar.png')
+
 
 def count_friends(users_path="hou_tri_users"):
-    users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
-    uids = set(users)
+    users, uids = _tri_users_dict_set(users_path)
     logging.info("looking at %d users",len(users))
     fols = []
     frds = []
@@ -275,8 +468,7 @@ def count_friends(users_path="hou_tri_users"):
 
 
 def edge_dist(users_path="hou_tri_users"):
-    users = dict((int(d['id']),d) for d in _read_tri_users(users_path))
-    uids = set(users)
+    users, uids = _tri_users_dict_set(users_path)
     logging.info("looking at %d users",len(users))
     for u in users:
         obj = Edges.get_id(int(u))
@@ -332,7 +524,7 @@ def tri_users():
         print json.dumps(small)
 
 
-def _read_tri_users(path):
+def _read_json(path):
     for l in open(path):
         yield json.loads(l)
 
@@ -344,7 +536,7 @@ def tri_legs(out_path='tri_hou.png',tris_path="tris",users_path="tri_users.json"
         def user_find(id):
             return users[id].geonames_place.to_d()
     else:
-        users = dict((d['id'],d) for d in _read_tri_users(users_path))
+        users = dict((d['id'],d) for d in _read_json(users_path))
         def user_find(id):
             return users[id]
 
