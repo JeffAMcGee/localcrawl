@@ -5,6 +5,7 @@ import logging
 import sys
 import heapq
 from datetime import datetime as dt
+import pdb
 
 from couchdbkit import ResourceNotFound, BulkSaveError
 import restkit.errors
@@ -198,7 +199,6 @@ def fetch_edges():
     User.database = connect("away_user")
     old_edges = set(int(row['id']) for row in Edges.database.paged_view("_all_docs",endkey="_"))
     uids = set(_users_from_scores())-old_edges
-    settings.pdb()
     for g in grouper(100,uids):
         for user in twitter.user_lookup(g):
             if user is None or user.protected: continue
@@ -235,9 +235,14 @@ def user_lookup(user):
     sleep_if_needed()
 
 
+def update_mongo():
+    for user in User.get_all():
+        try:                                                                             
+            user.save()
+        except:                                                                          
+            pdb.post_mortem()    
 
 def fill_50():
-    settings.pdb()
     Tweet.database = couch('hou_new_tweet')
     old_db = couch('houtx_tweet')
     res = twitter.TwitterResource()

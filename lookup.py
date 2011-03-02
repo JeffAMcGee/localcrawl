@@ -56,8 +56,7 @@ class LookupMaster(LocalProc):
                     if old_lookups == self.lookups:
                         print "halt because no new lookups"
                         self.halt=True
-                        settings.pdb()
-                        #self.read_scores()
+                        self.read_scores()
                         self.force_lookup()
 
                 logging.info("read_scores")
@@ -191,7 +190,6 @@ class LookupSlave(LocalProc):
                 continue
 
             logging.info("looking at %r"%[getattr(u,'screen_name','') for u in users])
-            settings.pdb()
             for job,body,user in zip(jobs,bodies,users):
                 if user is None:
                     logging.info("no profile for %d",body._id)
@@ -267,6 +265,8 @@ if __name__ == '__main__':
             proc = LookupMaster()
         elif sys.argv[1]=='s':
             proc = LookupSlave('x')
+        elif sys.argv[1]=='c':
+            create_slaves(LookupSlave, prefix="x")
     else:
         print "spawning minions!"
         create_slaves(LookupSlave)

@@ -39,9 +39,9 @@ def _run_slave(Proc,slave_id,*args):
         print "exception killed proc"
 
 
-def create_slaves(Proc,*args):
+def create_slaves(Proc, *args, **kwargs):
     for x in xrange(settings.slaves):
-        slave_id = string.letters[x]
+        slave_id = kwargs.get("prefix","")+string.letters[x]
         run_args = (Proc,slave_id)+args
         p = Process(target=_run_slave, args=run_args)
         p.start()

@@ -11,7 +11,6 @@ from restkit import Unauthorized
 import logging
 import multiprocessing
 import Queue
-import pdb
 
 import maroon
 from maroon import *
@@ -53,9 +52,7 @@ class CrawlMaster(LocalProc):
 
     def queue_crawl(self):
         logging.info("queue_crawl")
-        now = datetime.utcnow().timetuple()[0:6]
-        for user in User.database.paged_view('user/next_crawl',endkey=now):
-            uid = user['id']
+        for uid in User.next_crawl():
             if HALT: break
             if uid in self.waiting: continue # they are queued
             self.waiting.add(uid)
@@ -83,7 +80,6 @@ class CrawlSlave(LocalProc):
         self.done = done
 
     def run(self):
-        Tweet.database = CouchDB(settings.couchdb_root+"hou_new_tweet",True)
         #pdb.Pdb(stdin=open('/dev/stdin', 'r+'), stdout=open('/dev/stdout', 'r+')).set_trace()
         while not HALT:
             user=None
@@ -123,7 +119,6 @@ class CrawlSlave(LocalProc):
 
 
 if __name__ == '__main__':
-    User.database = CouchDB(settings.couchdb_root+"houtx_user",True)
     proc = CrawlMaster()
     create_slaves(CrawlSlave, proc.todo, proc.done)
     proc.run()

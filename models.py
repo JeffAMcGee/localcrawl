@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import json
 from couchdbkit import ResourceConflict
 import logging
@@ -69,6 +69,17 @@ class User(TwitterModel):
     url = TextProperty('url')
     utc_offset = IntProperty('utco')
 
+    @classmethod
+    def next_crawl(cls,endtime = None):
+        if endtime is None:
+            endtime = datetime.utcnow()
+        if settings.db == 'couch':
+            endkey=endtime.timetuple()[0:6]
+            users = cls.database.paged_view('user/next_crawl',endkey)
+            return (user['id'] for user in users)
+        else:
+            users = User.database.User.find({'ncd':{'$lt':endtime}}, {'_id':1})
+            return (user['_id'] for user in users)
 
 class Tweet(TwitterModel):
     _id = TwitterIdProperty('_id')
