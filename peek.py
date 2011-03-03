@@ -14,6 +14,7 @@ import math
 from collections import defaultdict
 from datetime import datetime as dt
 from operator import itemgetter
+import cjson
 
 import matplotlib
 matplotlib.use('Agg')
@@ -315,9 +316,10 @@ def find_ats(users_path="hou_tri_users"):
     users, uids = _tri_users_dict_set(users_path)
     for line in sys.stdin:
         d = json.loads(line)
-        if int(d['uid']) in uids and d.get('ats'):
+        if d.get('ats'):
+            local = int(d['uid']) in uids
             for at in d['ats']:
-                if int(at) in uids:
+                if local or int(at) in uids:
                     print "%s\t%s"%(d['uid'],at)
 
 def _parse_ats(ats_path):
@@ -360,11 +362,16 @@ def print_tri_counts(users_path="hou_tri_users"):
     for d in data:
         print json.dumps(d)
 
+def mainstream_edges(edges):
+    return [ e for e in edges
+        if 47<=e['lmfrd']+e['lmfol']<=300
+        if 101<=e['lyfrd']+e['lyfol']<=954
+        ]
 
 def split_tri_counts(counts_path):
-    edges = list(_read_json(counts_path))
+    edges = list(mainstream_edges(_read_json(counts_path)))
     third = len(edges)/3
-    return (edges[:third],edges[2*third:3*third])
+    return (edges[:third],edges[2*third:3*third],edges[third:2*third])
 
 def graph_thickness(counts_path="tri_counts"):
     far = 1
@@ -411,36 +418,60 @@ def graph_split_counts(counts_path="tri_counts"):
                 )
     ax.set_xlabel('count of users in both sets')
     ax.set_ylabel('users')
-    ax.set_ylim(0,4000)
+    ax.set_ylim(0,1000)
     ax.legend()
     fig.savefig('../www/split_pairs.png')
+
+
+def split_count_friends(counts_path="tri_counts"):
+    fig = plt.figure(figsize=(12,12))
+    ax = fig.add_subplot(111)
+    styles = ['solid','dotted','dashed']
+    for edges,style in zip(split_tri_counts(counts_path),styles):
+        keys = ('lmfrd','lmfol','lyfrd','lyfol')
+        for key,color in zip(keys,'rgbk'):
+            counts = [e[key] for e in edges]
+            ax.hist(counts,
+                histtype='step',
+                label=key,
+                color=color,
+                bins=range(1000),
+                linestyle=style,
+                cumulative=True,
+                )
+            print [style,key,numpy.median(counts)]
+    ax.set_xlabel('frds+fols')
+    ax.set_ylabel('users')
+    #ax.set_ylim(0,4000)
+    ax.legend()
+    fig.savefig('../www/split_fol_hist.png')
 
 
 def graph_tri_count_label(counts_path="tri_counts",label='mfan',me='mfol',you='yfol'):
     fig = plt.figure(figsize=(12,12))
     ax = fig.add_subplot(111)
     last_bin=0
-    dist_ratio = [ 
+    dist_ratio = [
         (d['dist'], 1.0*len(set(d[me]).intersection(d[you]))/d['all'])
-        for d in _read_json(counts_path)
-        if d['all'] and not d['rfriend']
+        for d in mainstream_edges(_read_json(counts_path))
+        if d['all']
     ]
     for bin in [.2,.4,.6,.8,1]:
         dists = [d for d,r in dist_ratio if last_bin<r<=bin]
         ax.hist(dists,
             bins=numpy.arange(0,100,.2),
             histtype='step',
-            normed=True,
+            #normed=True,
             label="%f-%f"%(last_bin,bin),
             cumulative=True,
             )
         last_bin=bin
     ax.legend()
-    ax.set_ylim(0,1)
-    #ax.set_ylim(0,4000)
+    #ax.set_ylim(0,1)
+    ax.set_ylim(0,2000)
     ax.set_xlabel('length of edge in miles')
     ax.set_ylabel('users')
-    fig.savefig('../www/tri_'+label+'_ratio_nr.png')
+    fig.savefig('../www/tri_'+label+'_ratio_main.png')
 
 
 def bar_graph(counts_path="tri_counts"):
@@ -548,7 +579,7 @@ def tri_users():
 
 def _read_json(path):
     for l in open(path):
-        yield json.loads(l)
+        yield simplejson.loads(l)
 
 
 def tri_legs(out_path='tri_hou.png',tris_path="tris",users_path="tri_users.json"):
