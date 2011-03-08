@@ -212,7 +212,7 @@ def fetch_edges():
                 continue
             edges.save()
             user.save()
-            sleep_if_needed()
+            twitter.sleep_if_needed()
 
 
 def stdin_lookup():
@@ -232,7 +232,7 @@ def user_lookup(user):
     user.lookup_done = True
     user.attempt_save()
     logging.info("saved %d from %s to %s",len(tweets),tweets[-1]._id,tweets[0]._id)
-    sleep_if_needed()
+    twitter.sleep_if_needed()
 
 
 def update_mongo():
@@ -252,12 +252,5 @@ def fill_50():
         last = max(int(row['id']) for row in view)
         tweets = res.save_timeline(uid, last_tid=last)
         logging.info("saved %d for %s",len(tweets),uid)
-        sleep_if_needed(res)
+        twitter.sleep_if_needed()
 
-
-def sleep_if_needed(twitter):
-    logging.info("api calls remaining: %d",twitter.remaining)
-    if twitter.remaining < 10:
-        delta = (twitter.reset_time-dt.utcnow())
-        logging.info("goodnight for %r",delta)
-        time.sleep(delta.seconds)

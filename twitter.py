@@ -101,7 +101,7 @@ class TwitterResource(Resource):
                 followers=self.followers_ids(user_id),
         )
 
-    def user_timeline(self, user_id, count=200, **kwargs):
+    def user_timeline(self, user_id, count=100, **kwargs):
         timeline = self.get_d(
             "statuses/user_timeline.json",
             user_id=user_id,
@@ -124,13 +124,12 @@ class TwitterResource(Resource):
                     uid,
                     max_id = max_id,
                     since_id = since_id,
-                    count = 100,
                 )
             except Unauthorized:
                 logging.warn("unauthorized!")
                 break
             if not tweets:
-                logging.warn("no tweets found after %d for %s",len(all_tweets),uid)
+                logging.warn("no tweets after %d for %s",len(all_tweets),uid)
                 break
             all_tweets+=tweets
             if len(tweets)<90:
@@ -138,10 +137,11 @@ class TwitterResource(Resource):
                 break
             max_id =int(tweets[-1]._id)-1
             if len(all_tweets)>=3150:
-                logging.error("hit max tweets after %d for %s",len(all_tweets),uid)
+                logging.error("hit max after %d for %s",len(all_tweets),uid)
                 break
         try:
-            Tweet.database.bulk_save_models([t for t in all_tweets if int(t._id)-1>since_id])
+            stored_tweets = [t for t in all_tweets if int(t._id)-1>since_id]
+            Tweet.database.bulk_save_models(stored_tweets)
         except BulkSaveError as err:
             #ignore conflicts
             if any(d['error']!='conflict' for d in err.errors):
@@ -150,3 +150,10 @@ class TwitterResource(Resource):
                 logging.warn("conflicts for %s:",uid)
                 logging.warn("%r",err.errors)
         return all_tweets
+
+    def sleep_if_needed(self):
+        logging.info("api calls remaining: %d",self.remaining)
+        if self.remaining < 30:
+            delta = (self.reset_time-dt.utcnow())
+            logging.info("goodnight for %r",delta)
+            time.sleep(delta.seconds)
