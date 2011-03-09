@@ -49,6 +49,10 @@ class User(TwitterModel):
     mention_score = IntProperty('ats')
     local_prob = FloatProperty('prob')
     geonames_place = ModelProperty('gnp',GeonamesPlace)
+    median_loc = Property('mloc')
+    rfriends = ListProperty('rfrds')
+    just_friends = ListProperty('jfrds')
+    just_followers = ListProperty('jfols')
     
     #properties from twitter
     verified = BoolProperty("ver")
