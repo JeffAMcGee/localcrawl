@@ -4,6 +4,8 @@ localcrawl
 
 The lo-calorie twitter neighborhood crawler.
 
+This project was merged into friendly location:
+https://github.com/jeffamcgee/friendloc
 
 LICENSE
 -------
