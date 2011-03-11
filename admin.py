@@ -4,6 +4,9 @@ import time
 import logging
 import sys
 import heapq
+import getopt
+import sys
+import cjson
 from datetime import datetime as dt
 import pdb
 
@@ -48,6 +51,16 @@ def import_json():
             else:
                 logging.warn("conflicts for %r",[d['id'] for d in err.errors])
 
+
+def filter_usians(path=None):
+    file =open(path) if path else sys.stdin 
+    for line in file:
+        tweet = cjson.decode(line)
+        if not tweet.get('coordinates'):
+            continue
+        lng,lat = tweet['coordinates']['coordinates']
+        if 24<lat<50 and -126<lng<-66:
+            print line,
 
 def import_old_json():
     for g in grouper(1000,sys.stdin):
