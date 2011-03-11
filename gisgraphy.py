@@ -40,7 +40,7 @@ class GisgraphyResource(Resource):
             )
         #try gisgraphy
         q = q.lower().strip().replace('-','/').replace(',',', ')
-        q = ''.join(re.split('[|&!]',q))
+        q = ''.join(re.split('[|&!+]',q))
         if not q: return None
         results = self.fulltextsearch(q)
         # otherwise, return the first result

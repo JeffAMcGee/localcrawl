@@ -74,6 +74,10 @@ class User(TwitterModel):
     utc_offset = IntProperty('utco')
 
     @classmethod
+    def with_location():
+        return User.database.User.find({'mloc':{'$exists':1}})
+
+    @classmethod
     def next_crawl(cls,endtime = None):
         if endtime is None:
             endtime = datetime.utcnow()
